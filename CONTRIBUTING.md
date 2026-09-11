@@ -19,8 +19,8 @@ You need Blender 4.2 or newer (5.2 LTS is what the maintainer runs), Python 3.11
 PATH for the pure tests, and Git.
 
 ```bat
-git clone <this repo>
-cd DuckPond
+git clone https://github.com/0xRabbidfly/duckpond-session-tracker.git
+cd duckpond-session-tracker
 pip install -r requirements-dev.txt          # ruff, pyinstaller, pillow: tooling only
 dev\launch.cmd --stub                        # Blender UI + demo fixture
 ```

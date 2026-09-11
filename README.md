@@ -1,5 +1,7 @@
 # Duck Pond
 
+[![CI](https://github.com/0xRabbidfly/duckpond-session-tracker/actions/workflows/ci.yml/badge.svg)](https://github.com/0xRabbidfly/duckpond-session-tracker/actions/workflows/ci.yml)
+[![Blender headless](https://github.com/0xRabbidfly/duckpond-session-tracker/actions/workflows/blender.yml/badge.svg)](https://github.com/0xRabbidfly/duckpond-session-tracker/actions/workflows/blender.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Blender 4.2+](https://img.shields.io/badge/Blender-4.2%2B%20(5.2%20LTS)-orange.svg)](https://www.blender.org/download/)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-3776AB.svg)](pyproject.toml)
