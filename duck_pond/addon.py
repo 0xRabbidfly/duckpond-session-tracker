@@ -5,7 +5,6 @@ import os
 
 import bpy
 
-from . import runtime as _runtime
 from .adapters.claude_code import ClaudeCodeAdapter
 from .adapters.stub import StubAdapter
 from .runtime import RT

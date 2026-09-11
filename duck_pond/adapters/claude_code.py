@@ -12,9 +12,7 @@ import glob
 import json
 import os
 import re
-import time
-from datetime import datetime, timezone
-from typing import Dict, List, Optional
+from datetime import datetime
 
 from .base import Adapter, FileTail, excerpt, tool_summary
 
@@ -66,13 +64,13 @@ class _TranscriptParser:
         self.sid = session_id
         self.aid = agent_id
         self.model = ""
-        self.open_tools: Dict[str, dict] = {}  # tool_use_id -> {name, input}
-        self.agent_tool_uses: Dict[str, dict] = {}  # tool_use_id -> Agent input
+        self.open_tools: dict[str, dict] = {}  # tool_use_id -> {name, input}
+        self.agent_tool_uses: dict[str, dict] = {}  # tool_use_id -> Agent input
         self.last_at = 0.0
         self.effort = ""
 
-    def parse(self, o: dict, now: float) -> List[dict]:
-        ev: List[dict] = []
+    def parse(self, o: dict, now: float) -> list[dict]:
+        ev: list[dict] = []
         t = o.get("type")
         at = _ts(o, now)
         self.last_at = max(self.last_at, at)
@@ -201,8 +199,8 @@ class _TranscriptParser:
         return ev
 
 
-    def _user_text(self, text: str, o: dict, base: dict, state: bool = True) -> List[dict]:
-        ev: List[dict] = []
+    def _user_text(self, text: str, o: dict, base: dict, state: bool = True) -> list[dict]:
+        ev: list[dict] = []
         stripped = text.strip()
         if not stripped:
             return ev
@@ -231,25 +229,25 @@ class _TranscriptParser:
 class ClaudeCodeAdapter(Adapter):
     name = "claude_code"
 
-    def __init__(self, projects_dir: Optional[str] = None, live_window_s: float = 600.0,
+    def __init__(self, projects_dir: str | None = None, live_window_s: float = 600.0,
                  replay_all: bool = False) -> None:
         self.projects_dir = projects_dir or os.path.join(os.path.expanduser("~"), ".claude", "projects")
         self.live_window_s = live_window_s
         self.replay_all = replay_all  # test mode: read every transcript regardless of age
-        self.tails: Dict[str, FileTail] = {}
-        self.parsers: Dict[str, _TranscriptParser] = {}
+        self.tails: dict[str, FileTail] = {}
+        self.parsers: dict[str, _TranscriptParser] = {}
         self.seen_sessions: set = set()
-        self.seen_emit_at: Dict[str, float] = {}
+        self.seen_emit_at: dict[str, float] = {}
         self.seen_subagents: set = set()
-        self.session_meta: Dict[str, dict] = {}
-        self.sub_tool_use: Dict[str, str] = {}  # toolUseId -> agentId
+        self.session_meta: dict[str, dict] = {}
+        self.sub_tool_use: dict[str, str] = {}  # toolUseId -> agentId
         self.last_scan = 0.0
 
     def describe(self) -> str:
         return f"claude_code ({self.projects_dir})"
 
     # ------------------------------------------------------------ discovery
-    def _discover(self, now: float) -> List[str]:
+    def _discover(self, now: float) -> list[str]:
         pattern = os.path.join(self.projects_dir, "*", "*.jsonl")
         out = []
         for path in glob.glob(pattern):
@@ -261,15 +259,15 @@ class ClaudeCodeAdapter(Adapter):
                 out.append(path)
         return out
 
-    def _subagent_files(self, session_path: str) -> List[str]:
+    def _subagent_files(self, session_path: str) -> list[str]:
         d = os.path.join(os.path.splitext(session_path)[0], "subagents")
         if not os.path.isdir(d):
             return []
         return sorted(glob.glob(os.path.join(d, "agent-*.jsonl")))
 
     # ------------------------------------------------------------ polling
-    def poll(self, now: float) -> List[dict]:
-        events: List[dict] = []
+    def poll(self, now: float) -> list[dict]:
+        events: list[dict] = []
         if now - self.last_scan >= 2.0 or not self.tails:
             self.last_scan = now
             for path in self._discover(now):

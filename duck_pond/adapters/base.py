@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 import os
-from typing import Iterator, List, Optional
+from collections.abc import Iterator
 
 
 class FileTail:
@@ -57,7 +57,7 @@ class Adapter:
 
     name = "base"
 
-    def poll(self, now: float) -> List[dict]:  # pragma: no cover - interface
+    def poll(self, now: float) -> list[dict]:  # pragma: no cover - interface
         return []
 
     def describe(self) -> str:
@@ -80,7 +80,7 @@ def excerpt(text: object, limit: int = 400) -> str:
     return s[:limit]
 
 
-def tool_summary(name: str, inp: Optional[dict]) -> str:
+def tool_summary(name: str, inp: dict | None) -> str:
     inp = inp or {}
     for key in ("command", "description", "pattern", "file_path", "query", "prompt", "url", "skill"):
         if key in inp and inp[key]:

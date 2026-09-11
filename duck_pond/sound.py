@@ -7,7 +7,6 @@ error = short buzz, geyser = a rising whoosh, tests pass/fail = up / down pair.
 from __future__ import annotations
 
 import time
-from typing import Dict, Optional
 
 try:
     import aud
@@ -33,8 +32,8 @@ class Sound:
     def __init__(self) -> None:
         self.enabled = aud is not None
         self.device = None
-        self.cache: Dict[str, object] = {}
-        self.last_at: Dict[str, float] = {}
+        self.cache: dict[str, object] = {}
+        self.last_at: dict[str, float] = {}
         self.muted_until = 0.0
         if self.enabled:
             try:

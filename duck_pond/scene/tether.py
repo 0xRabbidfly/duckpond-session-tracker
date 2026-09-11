@@ -2,15 +2,14 @@
 from __future__ import annotations
 
 import math
-from typing import List, Optional
 
 import bpy
 from mathutils import Vector, noise
 
+from ..theme import hex_to_rgba, redact
 from . import materials as M
 from . import meshes as MS
 from . import pool as P
-from ..theme import hex_to_rgba, redact
 
 SEGMENTS = 24
 TRAVERSE_S = 1.5
@@ -40,7 +39,7 @@ class Tether:
         self.obj["dp_pulse"] = 0.0
         c = color
         self.obj.color = (c[0] * 0.6, c[1] * 0.6, c[2] * 0.6, 1.0)
-        self.points: List[Vector] = [Vector((0, 0, 0)) for _ in range(SEGMENTS)]
+        self.points: list[Vector] = [Vector((0, 0, 0)) for _ in range(SEGMENTS)]
         self.pulse = 0.0
         self.retract = 1.0  # 1 = full length, shrinks while a duckling merges back
         self.base_color = (c[0] * 0.6, c[1] * 0.6, c[2] * 0.6)
@@ -118,15 +117,15 @@ class PacketSystem:
     """Object pools for packet spheres and their labels."""
 
     def __init__(self) -> None:
-        self.spheres: List[bpy.types.Object] = []
-        self.labels: List[bpy.types.Object] = []
-        self.free_spheres: List[bpy.types.Object] = []
-        self.free_labels: List[bpy.types.Object] = []
-        self.active: List[_PacketVisual] = []
+        self.spheres: list[bpy.types.Object] = []
+        self.labels: list[bpy.types.Object] = []
+        self.free_spheres: list[bpy.types.Object] = []
+        self.free_labels: list[bpy.types.Object] = []
+        self.active: list[_PacketVisual] = []
         self.redact_enabled = True
         # packet text deserves a hover, not a glance: labels ride only on the tethers of this
         # session (the hovered or pinned one). None = no labels anywhere.
-        self.label_session: Optional[str] = None
+        self.label_session: str | None = None
 
     def ensure_pools(self) -> None:
         if self.spheres:
@@ -156,7 +155,7 @@ class PacketSystem:
             self.labels.append(o)
         self.free_labels = list(self.labels)
 
-    def spawn(self, packet, tether: Tether) -> Optional[_PacketVisual]:
+    def spawn(self, packet, tether: Tether) -> _PacketVisual | None:
         self.ensure_pools()
         if not self.free_spheres:
             return None
@@ -177,7 +176,7 @@ class PacketSystem:
         tether.flash()
         return vis
 
-    def update(self, dt: float) -> List[_PacketVisual]:
+    def update(self, dt: float) -> list[_PacketVisual]:
         """Advance packets; return the ones that arrived this step."""
         arrived = []
         for vis in list(self.active):

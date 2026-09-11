@@ -4,7 +4,6 @@ from __future__ import annotations
 import time
 from collections import deque
 from dataclasses import dataclass, field
-from typing import Deque, Dict, List, Optional
 
 from .theme import tool_category
 
@@ -57,7 +56,7 @@ class Agent:
     error_at: float = 0.0
     error_message: str = ""
     # throughput samples: (at, tokens)
-    samples: Deque = field(default_factory=lambda: deque(maxlen=200))
+    samples: deque = field(default_factory=lambda: deque(maxlen=200))
     tool_bubble_until: float = 0.0
     # --- reimagined signals
     thinking: bool = False            # the last streamed block was a thinking block
@@ -66,7 +65,7 @@ class Agent:
     last_done_at: float = 0.0         # last end_turn (a finished report)
     denied_at: float = 0.0            # last tool denial
     denied_kind: str = ""             # user-rejected | permission-rule
-    tool_history: Deque = field(default_factory=lambda: deque(maxlen=120))  # (at, category, ok)
+    tool_history: deque = field(default_factory=lambda: deque(maxlen=120))  # (at, category, ok)
     tool_calls: int = 0
     tool_errors: int = 0
 
@@ -98,9 +97,9 @@ class Agent:
         cutoff = now - 60.0
         return float(sum(1 for at, _, _ in self.tool_history if at >= cutoff))
 
-    def recent_tool_mix(self, now: float, window: float = 300.0) -> Dict[str, int]:
+    def recent_tool_mix(self, now: float, window: float = 300.0) -> dict[str, int]:
         cutoff = now - window
-        mix: Dict[str, int] = {}
+        mix: dict[str, int] = {}
         for at, cat, _ in self.tool_history:
             if at >= cutoff:
                 mix[cat] = mix.get(cat, 0) + 1
@@ -119,7 +118,7 @@ class SubAgent(Agent):
     background: bool = False          # launched with run_in_background: outlives the parent's turn
     parent_agent_id: str = ""         # non-empty for nested sub-agents
     spawn_depth: int = 1
-    packets: Deque = field(default_factory=lambda: deque(maxlen=60))
+    packets: deque = field(default_factory=lambda: deque(maxlen=60))
 
 
 TITLE_RANK = {"custom": 4, "agent": 3, "ai": 2, "prompt": 1, "": 0}
@@ -143,11 +142,11 @@ class Session(Agent):
     last_compaction_at: float = 0.0
     tool_time_ms: int = 0
     api_time_ms: int = 0
-    turn_durations: Deque = field(default_factory=lambda: deque(maxlen=30))  # ms per finished turn
-    model_usage: Dict[str, dict] = field(default_factory=dict)
-    subagents: Dict[str, SubAgent] = field(default_factory=dict)
+    turn_durations: deque = field(default_factory=lambda: deque(maxlen=30))  # ms per finished turn
+    model_usage: dict[str, dict] = field(default_factory=dict)
+    subagents: dict[str, SubAgent] = field(default_factory=dict)
 
-    def live_subagents(self) -> List[SubAgent]:
+    def live_subagents(self) -> list[SubAgent]:
         return [s for s in self.subagents.values() if not s.done]
 
     def set_title(self, title: str, source: str) -> bool:
@@ -181,19 +180,19 @@ class Cue:
 
 class Fleet:
     def __init__(self) -> None:
-        self.sessions: Dict[str, Session] = {}
-        self.cues: List[Cue] = []
+        self.sessions: dict[str, Session] = {}
+        self.cues: list[Cue] = []
         self.event_count = 0
         # fleet-wide output tokens per second sample (at, tokens) — drives the weather
-        self.samples: Deque = deque(maxlen=4000)
+        self.samples: deque = deque(maxlen=4000)
         # per-minute history for the scoreboard sparkline: (minute_epoch, tokens_out, tool_calls)
-        self.history: Deque = deque(maxlen=60)
+        self.history: deque = deque(maxlen=60)
 
     # ------------------------------------------------------------------ queries
-    def live_sessions(self) -> List[Session]:
+    def live_sessions(self) -> list[Session]:
         return [s for s in self.sessions.values() if s.state != "ended"]
 
-    def find_agent(self, session_id: str, agent_id: str = "") -> Optional[Agent]:
+    def find_agent(self, session_id: str, agent_id: str = "") -> Agent | None:
         s = self.sessions.get(session_id)
         if not s:
             return None
@@ -242,7 +241,7 @@ class Fleet:
         for c in self.cues[n0:]:
             c.at = at
 
-    def _agent(self, ev: dict, sid: str) -> Optional[Agent]:
+    def _agent(self, ev: dict, sid: str) -> Agent | None:
         return self.find_agent(sid, ev.get("agent_id", "") or "")
 
     def _on_SessionSeen(self, ev, sid, at):
@@ -550,6 +549,6 @@ class Fleet:
                     sub.set_state("idle", now, "inferred")
         self._bucket(now)
 
-    def drain_cues(self) -> List[Cue]:
+    def drain_cues(self) -> list[Cue]:
         out, self.cues = self.cues, []
         return out

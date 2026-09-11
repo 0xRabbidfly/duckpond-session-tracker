@@ -1,0 +1,47 @@
+name: Bug report
+description: Something in the pool is wrong, jittery, missing or crashing
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you saw, and what you expected to see instead.
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: How to reproduce
+      description: Steps, flags used (`--kiosk`, `--stub`, ...), and whether it happens with the demo fixture (`--stub`).
+      placeholder: |
+        1. DuckPond.exe --stub
+        2. Hover the second duck
+        3. ...
+    validations:
+      required: true
+  - type: input
+    id: versions
+    attributes:
+      label: Blender and Duck Pond versions
+      placeholder: Blender 5.2.1 LTS, Duck Pond 0.2.0
+    validations:
+      required: true
+  - type: input
+    id: os
+    attributes:
+      label: OS and GPU
+      placeholder: Windows 11, RTX 3060
+  - type: textarea
+    id: log
+    attributes:
+      label: Log
+      description: |
+        Paste the relevant part of Blender's console or `%LOCALAPPDATA%\DuckPond\last-run.log`.
+        Remove anything you would not want public: transcripts can contain prompts, paths and secrets.
+      render: text
+  - type: textarea
+    id: media
+    attributes:
+      label: Screenshot or clip
+      description: Drag an image or short video here if the problem is visual.

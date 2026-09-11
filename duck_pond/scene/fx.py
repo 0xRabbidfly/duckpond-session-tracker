@@ -9,15 +9,14 @@ from __future__ import annotations
 
 import math
 import random
-from typing import List, Optional
 
 import bpy
 from mathutils import Vector
 
+from ..theme import STATE_COLORS, hex_to_rgba, tool_chip
 from . import materials as M
 from . import meshes as MS
 from . import pool as P
-from ..theme import STATE_COLORS, hex_to_rgba, tool_chip
 
 CHIP_POOL = 48
 ORB_POOL = 48
@@ -55,15 +54,15 @@ class _Drop:
 
 class FX:
     def __init__(self) -> None:
-        self.chips: List[bpy.types.Object] = []
-        self.free_chips: List[bpy.types.Object] = []
-        self.active_chips: List[_Chip] = []
-        self.orbs: List[bpy.types.Object] = []
-        self.free_orbs: List[bpy.types.Object] = []
-        self.active_orbs: List[_Orb] = []
-        self.drops: List[bpy.types.Object] = []
-        self.free_drops: List[bpy.types.Object] = []
-        self.active_drops: List[_Drop] = []
+        self.chips: list[bpy.types.Object] = []
+        self.free_chips: list[bpy.types.Object] = []
+        self.active_chips: list[_Chip] = []
+        self.orbs: list[bpy.types.Object] = []
+        self.free_orbs: list[bpy.types.Object] = []
+        self.active_orbs: list[_Orb] = []
+        self.drops: list[bpy.types.Object] = []
+        self.free_drops: list[bpy.types.Object] = []
+        self.active_drops: list[_Drop] = []
         self.rain = 0.0  # 0..1 intensity, set by the world layer
         self._rain_acc = 0.0
 

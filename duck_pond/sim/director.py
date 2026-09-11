@@ -9,13 +9,12 @@ tests/headless_director.py asserts the second difference stays bounded.
 from __future__ import annotations
 
 import math
-from typing import Dict, Optional, Tuple
 
 from mathutils import Vector
 
 from ..scene import pool as P
 
-Key = Tuple[str, str]
+Key = tuple[str, str]
 
 PRIORITY = {"blocked": 100, "question": 80, "spawn": 60, "compaction": 55, "error": 50, "done": 35, "prompt": 30}
 HOLD_S = 9.0          # how long a beat holds the camera
@@ -26,11 +25,11 @@ COOLDOWN_S = 30.0     # do not revisit the same duck sooner than this
 class Director:
     def __init__(self) -> None:
         self.enabled = False
-        self.target: Optional[Key] = None
+        self.target: Key | None = None
         self.target_until = 0.0
         self.last_overview = 0.0
-        self.last_visit: Dict[Key, float] = {}
-        self.notices: Dict[Key, Tuple[int, float]] = {}
+        self.last_visit: dict[Key, float] = {}
+        self.notices: dict[Key, tuple[int, float]] = {}
         self.vel = Vector((0.0, 0.0, 0.0))
         self.look = Vector(P.CAM_OVERVIEW[1])
         self.look_vel = Vector((0.0, 0.0, 0.0))
@@ -43,7 +42,7 @@ class Director:
             self.notices[key] = (pr, now)
 
     # ------------------------------------------------------------ choose
-    def _pick(self, fleet, ducks, now: float) -> Optional[Key]:
+    def _pick(self, fleet, ducks, now: float) -> Key | None:
         best, best_score = None, -1.0
         for key, (pr, at) in list(self.notices.items()):
             if now - at > 30.0 or key not in ducks:

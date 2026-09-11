@@ -13,7 +13,6 @@ from __future__ import annotations
 import copy
 import json
 import time
-from typing import List
 
 from .base import Adapter
 
@@ -39,8 +38,8 @@ class StubAdapter(Adapter):
     def _suffix(self, sid: str) -> str:
         return sid if self.iteration == 0 else f"{sid}-{self.iteration}"
 
-    def poll(self, now: float) -> List[dict]:
-        out: List[dict] = []
+    def poll(self, now: float) -> list[dict]:
+        out: list[dict] = []
         elapsed = (now - self.started) * self.speed
         while self.cursor < len(self.events) and self.events[self.cursor].get("t", 0.0) <= elapsed:
             ev = copy.deepcopy(self.events[self.cursor])

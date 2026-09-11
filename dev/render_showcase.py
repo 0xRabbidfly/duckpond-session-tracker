@@ -68,7 +68,8 @@ def render(name: str, w=1600, h=900, samples=32):
     print(f"[showcase] {name} in {time.time() - t:.1f}s")
 
 
-def frame_camera_on(key, back=Vector((-2.6, -4.4, 2.6))):
+def frame_camera_on(key, back=None):
+    back = back if back is not None else Vector((-2.6, -4.4, 2.6))
     d = RT.ducks.get(key)
     cam = P.camera()
     if d is None:

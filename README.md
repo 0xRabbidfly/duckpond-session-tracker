@@ -1,5 +1,10 @@
 # Duck Pond
 
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![Blender 4.2+](https://img.shields.io/badge/Blender-4.2%2B%20(5.2%20LTS)-orange.svg)](https://www.blender.org/download/)
+[![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-3776AB.svg)](pyproject.toml)
+[![Ruff](https://img.shields.io/badge/lint-ruff-261230.svg)](https://docs.astral.sh/ruff/)
+
 See every AI agent working on this PC, live, at a glance, without reading logs.
 
 A swimming pool in Blender. Every rubber duck is a Claude Code session; ducklings on tethers
@@ -11,22 +16,31 @@ finished reports rise as gold ones. Every tool call pops a coloured **chip** nam
 word (`bash`, `edit`, `read`, `web`, `test`, `spawn`). Context compaction is a geyser. Errors
 bring rain. The sun follows your clock; after dark the lido lights come on and the ducks glow.
 The far deck is a **scoreboard**; each lane sign carries branches, state dots and a coin stack
-for spend. Spec: [`SPEC.md`](SPEC.md), §15 for what changed in v0.2.
+for spend. Spec: [`SPEC.md`](SPEC.md), §15 for what changed in v0.2. Code tour:
+[`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
 
-![overview](out/showcase_overview.png)
+![The pool: four lanes, ducks with hats, ducklings on tethers, the scoreboard on the far deck](docs/media/overview.jpg)
+
+| | |
+|---|---|
+| ![A busy fleet: chips, packets, wakes](docs/media/busy.jpg) | ![A duck blocked on a permission: red lamp, red halo, red rings](docs/media/blocked.jpg) |
+| ![Kiosk mode: name and status tag on every duck](docs/media/kiosk_tags.jpg) | ![After dark: lido lamps on, ducks glowing](docs/media/night.jpg) |
 
 ## Run it
 
-Requires Blender 5.x (found automatically; installed here at
-`C:\Program Files\Blender Foundation\Blender 5.2`).
+Requires [Blender](https://www.blender.org/download/) 4.2 or newer (developed on 5.2 LTS).
+The launcher finds it in the default install folder, on `PATH`, or via the `DUCKPOND_BLENDER`
+environment variable. Python is only needed to build the executable or run the pure tests.
 
-**As an executable.** Build once, then double-click `dist\DuckPond.exe` (7.8 MB, no console
-window). It carries the add-on inside, unpacks it to `%LOCALAPPDATA%\DuckPond\app-<version>`
+**As an executable (Windows).** Build once, then double-click `dist\DuckPond.exe` (7.8 MB, no
+console window). It carries the add-on inside, unpacks it to `%LOCALAPPDATA%\DuckPond\app-<version>`
 on first run, finds Blender, and starts the pool. Copy it anywhere; only Blender needs to be
 installed. The log of the last run is `%LOCALAPPDATA%\DuckPond\last-run.log`.
 
 ```bat
+pip install -r requirements-dev.txt
 python dev\build_exe.py            # -> dist\DuckPond.exe (PyInstaller, one file, duck icon)
+python dev\build_exe.py --launch   # same, then refresh every copy and relaunch --kiosk --sound
 
 dist\DuckPond.exe                  # the pool in a maximised window (movable, minimisable), live sessions
 dist\DuckPond.exe --fullscreen     # borderless fullscreen instead (Alt+F11 toggles back)
@@ -38,7 +52,7 @@ dist\DuckPond.exe --blender "D:\Blender\blender.exe"   # if Blender is somewhere
 
 For an always-on second monitor, put a shortcut to `DuckPond.exe --kiosk` in `shell:startup`.
 
-**From the repo** (same thing, via the batch files):
+**From the repo** (same thing, via the batch files; on macOS or Linux call Blender directly):
 
 ```bat
 DuckPond.cmd                    # APP MODE: pool only, maximised window, live Claude Code sessions
@@ -46,12 +60,13 @@ DuckPond.cmd --kiosk --sound    # second monitor: + auto camera director, tags o
 dev\launch.cmd                  # dev: live sessions with the normal Blender UI + sidebar
 dev\launch.cmd --stub           # demo fixture (4 sessions, 5 sub-agents, 75 s loop)
 dev\launch.cmd --both
+
+blender --python dev/launch.py -- --app --kiosk --sound   # any OS
 ```
 
 Blender is the app. The window is a normal one: minimise, move, maximise and snap it like
 any other. Ctrl+Space restores the Blender panels, Alt+F11 toggles borderless fullscreen,
-Alt+F4 quits. For an always-on second monitor, put a shortcut to `DuckPond.cmd --kiosk` in
-`shell:startup`. The **Duck Pond** tab in the sidebar (`N`) has every toggle, including a
+Alt+F4 quits. The **Duck Pond** tab in the sidebar (`N`) has every toggle, including a
 clock override to preview the night lido.
 
 | Key (viewport) | Action |
@@ -106,16 +121,21 @@ what it said, sub-agents, queue, permission mode, tool mix of the last 10 minute
 hover; the sidebar (all of that plus spend per model, sub-agent list, packets, last tools)
 is the click. Packet text rides a tether only for the hovered or pinned session.
 
-## Data
+![The hover card: state bar, context meter, the question quoted, current tool, sub-agents](docs/media/hover_card.jpg)
 
-The Claude Code adapter tails `~/.claude/projects` on a worker thread and never writes
-there. Beyond sessions, sub-agents, tool calls, prompts, responses, usage and cost it now
-reads: thinking blocks, `AskUserQuestion` (exact "asking you"), tool denials
-(`toolDenialKind`), queued prompts (`queue-operation`), compaction boundaries, turn
-durations, `cost-state` (lines added/removed, per-model usage), permission mode, effort,
+## Data and privacy
+
+The Claude Code adapter tails `~/.claude/projects` on a worker thread and **never writes
+there**. Nothing leaves the machine. Beyond sessions, sub-agents, tool calls, prompts,
+responses, usage and cost it reads: thinking blocks, `AskUserQuestion` (exact "asking you"),
+tool denials (`toolDenialKind`), queued prompts (`queue-operation`), compaction boundaries,
+turn durations, `cost-state` (lines added/removed, per-model usage), permission mode, effort,
 `is_error` on tool results, and sub-agent `.meta.json` (`parentAgentId`, `spawnDepth`,
 `run_in_background`). Session states other than questions and denials are inferred from
 the transcript tail and marked so on the card.
+
+Text excerpts shown on cards and tags are redacted by default (keys, tokens, long random
+identifiers) and truncated. See [`SECURITY.md`](SECURITY.md).
 
 ## Contract and tests
 
@@ -126,6 +146,7 @@ Personality (cruising speed, wander, bob, curiosity) lives inside that contract.
 director camera is a critically damped spring on position and look-at.
 
 ```bat
+ruff check .                                               # lint (pyproject.toml)
 python tests\test_core.py                                  # reducer, redaction, adapter on real logs
 python tests\test_signals.py                               # questions, denials, compaction, queue, cost, inference
 blender -b --python tests\headless_motion.py               # the smoothness contract (no snaps, no sawing, no sliding)
@@ -135,11 +156,15 @@ blender -b --python dev\render_showcase.py                 # out\showcase_*.png 
 blender --python dev\gui_shot.py -- --kiosk --out out\gui_tags.png   # real GUI overlay screenshot
 ```
 
+CI runs the lint and the pure tests on every push, and the headless Blender tests whenever
+the add-on, tests or fixtures change.
+
 ## Not built yet
 
 - Replay mode on the timeline, Codex and VS Code adapters (stub-only ducks), GIF export.
 - Exact states need a hook feed; today `awaiting_permission` is inferred from timing.
 - Remote / cloud sessions do not write local logs and are not shown.
+- macOS / Linux launchers. The add-on is plain `bpy`; only the `.exe` and `.cmd` files are Windows-shaped.
 
 ## Layout
 
@@ -156,7 +181,20 @@ duck_pond/
   ui/                cards (glance/hover/click text), hover (gpu/blf card + tags), panel
   runtime.py         timer (data, 4 Hz) + frame handler (motion, fx, sky, director)
   addon.py           Blender registration, preferences, operators, toggles
+launcher/            DuckPond.exe source (finds Blender, unpacks the add-on, starts the pool) + icon
 fixtures/demo.json   scripted demo: fan-out, nested + background agents, question, denial, compaction
-dev/                 launch.py|cmd, render_showcase.py, gui_shot.py
+dev/                 launch.py|cmd, build_exe.py, render_showcase.py, gui_shot.py, render_icon.py
 tests/               core, signals, headless motion / smoke / director
+docs/                ARCHITECTURE.md, media/
 ```
+
+## Contributing
+
+Issues and pull requests are welcome. [`CONTRIBUTING.md`](CONTRIBUTING.md) has the setup,
+the test commands, the smoothness contract and what a good change looks like. Two rules
+survive everything: every kept idea must be visible in Blender, and nothing ever writes to
+`~/.claude/projects`. Please follow the [code of conduct](CODE_OF_CONDUCT.md).
+
+## License
+
+[MIT](LICENSE) © 2026 Nuno Borges. Not affiliated with Anthropic or the Blender Foundation.

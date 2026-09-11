@@ -5,15 +5,13 @@ Numbers live here, on purpose. The water is for feeling; the deck is for reading
 from __future__ import annotations
 
 import time
-from typing import Dict, List, Optional
 
 import bpy
-from mathutils import Vector
 
+from ..theme import STATE_COLORS, hex_to_rgba, redact
 from . import materials as M
 from . import meshes as MS
 from . import pool as P
-from ..theme import STATE_COLORS, hex_to_rgba, redact
 
 BOARD_W = 9.0
 BOARD_H = 2.2
@@ -50,11 +48,11 @@ class Scoreboard:
     throughput. Below: a 30-minute bar chart of output tokens per minute, as real geometry."""
 
     def __init__(self) -> None:
-        self.board: Optional[bpy.types.Object] = None
+        self.board: bpy.types.Object | None = None
         self.line1 = None
         self.line2 = None
         self.line3 = None
-        self.bars: List[bpy.types.Object] = []
+        self.bars: list[bpy.types.Object] = []
         self.last_update = 0.0
 
     def ensure(self) -> None:
@@ -120,7 +118,7 @@ class LaneSigns:
     a small live strip of state colours (one dot per session in the lane)."""
 
     def __init__(self) -> None:
-        self.objects: Dict[str, dict] = {}
+        self.objects: dict[str, dict] = {}
         self.last_update = 0.0
 
     def _ensure(self, key: str, i: int, y: float, w: float) -> dict:

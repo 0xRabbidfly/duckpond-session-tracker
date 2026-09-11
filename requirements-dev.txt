@@ -1,0 +1,4 @@
+# Tools for contributors. The add-on itself has no dependencies beyond Blender.
+ruff>=0.6          # lint (configured in pyproject.toml)
+pyinstaller>=6.0   # dev/build_exe.py -> dist/DuckPond.exe
+pillow>=10.0       # icon generation in dev/build_exe.py

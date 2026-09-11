@@ -1,15 +1,12 @@
 """Runtime: timer drains adapters into the fleet; frame handler animates the scene."""
 from __future__ import annotations
 
-import os
 import queue
 import threading
 import time
 import traceback
-from typing import Dict, List, Optional, Tuple
 
 import bpy
-
 from mathutils import Vector
 
 from .adapters.base import Adapter
@@ -32,15 +29,15 @@ REMOVE_AFTER_S = 60.0
 PACKET_MAX_AGE_S = 10.0
 FX_MAX_AGE_S = 10.0  # effects for events older than this (startup replay) are not shown
 
-Key = Tuple[str, str]
+Key = tuple[str, str]
 
 
 class Runtime:
     def __init__(self) -> None:
         self.fleet = Fleet()
-        self.adapters: List[Adapter] = []
-        self.ducks: Dict[Key, DuckObj] = {}
-        self.tethers: Dict[Key, Tether] = {}
+        self.adapters: list[Adapter] = []
+        self.ducks: dict[Key, DuckObj] = {}
+        self.tethers: dict[Key, Tether] = {}
         self.lanes = P.Lanes()
         self.ripples = Ripples()
         self.packets = PacketSystem()
@@ -57,8 +54,8 @@ class Runtime:
         self.paused = False
         self.last_frame_t = 0.0
         self.last_tick_t = 0.0
-        self.pinned: Optional[Key] = None
-        self.hover: Optional[Key] = None
+        self.pinned: Key | None = None
+        self.hover: Key | None = None
         self.hover_kind = ""
         self.redact = True
         self.color_overrides: dict = {}
@@ -70,13 +67,13 @@ class Runtime:
         self.idle_after = IDLE_AFTER_S
         self.end_after = END_AFTER_S
         self.remove_after = REMOVE_AFTER_S
-        self._queue: "queue.Queue[dict]" = queue.Queue()
-        self._worker: Optional[threading.Thread] = None
+        self._queue: queue.Queue[dict] = queue.Queue()
+        self._worker: threading.Thread | None = None
         self._worker_stop = threading.Event()
         self.threaded = True
 
     # ------------------------------------------------------------ lifecycle
-    def start(self, adapters: List[Adapter], gui: Optional[bool] = None) -> None:
+    def start(self, adapters: list[Adapter], gui: bool | None = None) -> None:
         if self.running:
             self.stop()
         self.adapters = adapters
@@ -175,7 +172,7 @@ class Runtime:
                 self.last_error = traceback.format_exc(limit=3)
                 print("[duck_pond] adapter error:", self.last_error)
 
-    def tick(self, now: Optional[float] = None) -> None:
+    def tick(self, now: float | None = None) -> None:
         now = time.time() if now is None else now
         self.last_tick_t = now
         if self._worker is not None:
@@ -330,7 +327,7 @@ class Runtime:
             self.hover = None
 
     # ------------------------------------------------------------ frame
-    def frame(self, now: Optional[float] = None, dt: Optional[float] = None) -> None:
+    def frame(self, now: float | None = None, dt: float | None = None) -> None:
         now = time.time() if now is None else now
         if dt is None:
             dt = min(0.1, max(0.0, now - self.last_frame_t))
@@ -359,7 +356,7 @@ class Runtime:
             self.director.step(self.fleet, self.ducks, self.lanes, cam, now, dt)
 
     # ------------------------------------------------------------ queries for UI
-    def agent_for_object(self, obj) -> Tuple[str, Optional[Key]]:
+    def agent_for_object(self, obj) -> tuple[str, Key | None]:
         if obj is None or "dp_kind" not in obj:
             return "", None
         kind = obj["dp_kind"]

@@ -1,0 +1,34 @@
+[project]
+name = "duck-pond"
+version = "0.2.0"
+description = "See every AI agent working on this PC, live, at a glance. A Blender add-on."
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+authors = [{ name = "Nuno Borges" }]
+keywords = ["blender", "claude-code", "agents", "visualization", "observability"]
+
+# Duck Pond is a Blender add-on, not a pip package: nothing here is meant to be installed.
+# This file carries the project metadata and the lint configuration used by CI.
+
+[tool.ruff]
+target-version = "py311"   # Blender 4.2 ships 3.11; 5.x ships 3.13
+line-length = 120
+extend-exclude = ["build", "dist", "out"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP"]
+ignore = [
+    "E501",  # long lines: tables of colours and scripted fixtures read better unwrapped
+    "B905",  # zip(strict=) adds noise in per-frame math
+    "B007",  # unused loop variables are common in bpy iteration
+]
+
+[tool.ruff.lint.per-file-ignores]
+# scripts that put the repo on sys.path before importing duck_pond
+"tests/*" = ["E402"]
+"dev/*" = ["E402"]
+"launcher/*" = ["E402"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["duck_pond"]

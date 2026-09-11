@@ -8,15 +8,12 @@ from __future__ import annotations
 
 import math
 import time
-from typing import List, Optional
 
 import bpy
-from mathutils import Vector
 
 from . import materials as M
 from . import meshes as MS
 from . import pool as P
-from ..theme import hex_to_rgba
 
 CHOP_FULL_TPS = 400.0     # fleet output tokens/sec that reads as "storm"
 RAIN_FULL_ERR = 4.0       # errors in the last 2 min that reads as a downpour
@@ -32,13 +29,13 @@ def daylight(hour: float) -> float:
 
 class Sky:
     def __init__(self) -> None:
-        self.clock_override: Optional[float] = None  # hour of day, e.g. 22.5; None = wall clock
+        self.clock_override: float | None = None  # hour of day, e.g. 22.5; None = wall clock
         self.chop = 0.0
         self.chop_target = 0.0
         self.night = 0.0
         self.rain = 0.0
         self.rain_target = 0.0
-        self.lights: List[bpy.types.Object] = []
+        self.lights: list[bpy.types.Object] = []
         self.last_tick = 0.0
         self._primed = False
 

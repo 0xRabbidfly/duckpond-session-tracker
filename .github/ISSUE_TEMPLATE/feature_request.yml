@@ -1,0 +1,25 @@
+name: Feature request
+description: A signal you want to see, a body-language idea, a new harness
+labels: [enhancement]
+body:
+  - type: textarea
+    id: signal
+    attributes:
+      label: What should be visible, and when
+      description: |
+        Duck Pond's one rule: see what every agent is doing at a glance, without reading logs.
+        What real event or state is invisible today, and how would a viewer notice it from across the room?
+    validations:
+      required: true
+  - type: textarea
+    id: source
+    attributes:
+      label: Where the data comes from
+      description: |
+        Which transcript line, meta file or event carries it? Paste a redacted sample if you have one.
+        (Duck Pond only reads `~/.claude/projects`; it never writes there.)
+  - type: textarea
+    id: sketch
+    attributes:
+      label: Sketch
+      description: Optional. Body language, colour, sound, deck element, camera move. Pictures welcome.

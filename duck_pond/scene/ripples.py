@@ -1,8 +1,6 @@
 """Ripple rings on the water and bubbles for tool calls. Pooled objects."""
 from __future__ import annotations
 
-from typing import List
-
 import bpy
 from mathutils import Vector
 
@@ -41,12 +39,12 @@ class _Bubble:
 
 class Ripples:
     def __init__(self) -> None:
-        self.rings: List[bpy.types.Object] = []
-        self.bubbles: List[bpy.types.Object] = []
-        self.free_rings: List[bpy.types.Object] = []
-        self.free_bubbles: List[bpy.types.Object] = []
-        self.active_rings: List[_Ring] = []
-        self.active_bubbles: List[_Bubble] = []
+        self.rings: list[bpy.types.Object] = []
+        self.bubbles: list[bpy.types.Object] = []
+        self.free_rings: list[bpy.types.Object] = []
+        self.free_bubbles: list[bpy.types.Object] = []
+        self.active_rings: list[_Ring] = []
+        self.active_bubbles: list[_Bubble] = []
 
     def ensure_pools(self) -> None:
         if self.rings:

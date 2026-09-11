@@ -3,14 +3,13 @@ from __future__ import annotations
 
 import math
 import time
-from typing import Dict, List, Optional, Tuple
 
 import bpy
 from mathutils import Vector
 
+from ..theme import hex_to_rgba
 from . import materials as M
 from . import meshes as MS
-from ..theme import hex_to_rgba
 
 COLL_NAME = "DuckPond"
 POOL_X = 16.0
@@ -84,7 +83,7 @@ def camera_lane(y0: float, y1: float) -> None:
 
 def ensure_pool() -> None:
     scene = bpy.context.scene
-    coll = collection()
+    collection()
     if get("DP_Water"):
         camera()
         return
@@ -202,15 +201,15 @@ class Lanes:
     that finishes and restarts, or a demo loop, does not re-space the pool every time."""
 
     def __init__(self) -> None:
-        self.keys: List[str] = []
-        self.bounds: Dict[str, Tuple[float, float]] = {}
-        self.objects: List[bpy.types.Object] = []
-        self.last_seen: Dict[str, float] = {}
+        self.keys: list[str] = []
+        self.bounds: dict[str, tuple[float, float]] = {}
+        self.objects: list[bpy.types.Object] = []
+        self.last_seen: dict[str, float] = {}
 
-    def y_range(self, key: str) -> Tuple[float, float]:
+    def y_range(self, key: str) -> tuple[float, float]:
         return self.bounds.get(key, (0.5, POOL_Y - 0.5))
 
-    def update(self, keys: List[str], now: Optional[float] = None) -> bool:
+    def update(self, keys: list[str], now: float | None = None) -> bool:
         now = time.time() if now is None else now
         present = set(keys)
         for k in present:

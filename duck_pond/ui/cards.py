@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import time
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Tuple
 
 from ..model import Fleet, Session, SubAgent
 from ..theme import HARNESS_LABELS, STATE_COLORS, hex_to_rgba, model_label, redact, tool_chip
@@ -44,7 +43,7 @@ def fmt_elapsed(seconds: float) -> str:
     return f"{s} s"
 
 
-def state_rgba(state: str) -> Tuple[float, float, float, float]:
+def state_rgba(state: str) -> tuple[float, float, float, float]:
     return hex_to_rgba(STATE_COLORS.get(state, "#8A93A6"))
 
 
@@ -54,11 +53,11 @@ class Card:
     state: str
     state_text: str
     subtitle: str = ""
-    lines: List[str] = field(default_factory=list)
+    lines: list[str] = field(default_factory=list)
     context_frac: float = 0.0
     context_text: str = ""
     highlight: str = ""            # a question or a denial, drawn in the state colour
-    tool_mix: List[Tuple[str, int, str]] = field(default_factory=list)  # (chip text, count, hex)
+    tool_mix: list[tuple[str, int, str]] = field(default_factory=list)  # (chip text, count, hex)
     inferred: bool = False
 
 
@@ -70,7 +69,7 @@ def _state_text(agent, now: float) -> str:
     return f"{label}{conf} · {fmt_elapsed(now - agent.state_since)}"
 
 
-def _mix(agent, now: float) -> List[Tuple[str, int, str]]:
+def _mix(agent, now: float) -> list[tuple[str, int, str]]:
     mix = agent.recent_tool_mix(now, 600.0)
     out = []
     for cat, n in sorted(mix.items(), key=lambda kv: -kv[1])[:6]:
@@ -166,7 +165,7 @@ def tether_card(s: Session, sub: SubAgent, now: float, redact_on: bool) -> Card:
     return card
 
 
-def card_for(fleet: Fleet, kind: str, key: Optional[Tuple[str, str]], now: float, redact_on: bool) -> Optional[Card]:
+def card_for(fleet: Fleet, kind: str, key: tuple[str, str] | None, now: float, redact_on: bool) -> Card | None:
     if not key:
         return None
     sid, aid = key
@@ -184,7 +183,7 @@ def card_for(fleet: Fleet, kind: str, key: Optional[Tuple[str, str]], now: float
 
 
 # ---------------------------------------------------------------- compatibility helpers
-def lines_for(fleet: Fleet, kind: str, key, now: float, redact_on: bool) -> List[str]:
+def lines_for(fleet: Fleet, kind: str, key, now: float, redact_on: bool) -> list[str]:
     c = card_for(fleet, kind, key, now, redact_on)
     if c is None:
         return []
@@ -194,7 +193,7 @@ def lines_for(fleet: Fleet, kind: str, key, now: float, redact_on: bool) -> List
     return out + c.lines
 
 
-def name_for(fleet: Fleet, key: Optional[Tuple[str, str]], redact_on: bool) -> str:
+def name_for(fleet: Fleet, key: tuple[str, str] | None, redact_on: bool) -> str:
     """The display name alone, for the big floating tag over a duck."""
     if not key:
         return ""
@@ -209,7 +208,7 @@ def name_for(fleet: Fleet, key: Optional[Tuple[str, str]], redact_on: bool) -> s
     return redact(s.display_name, redact_on, 48)
 
 
-def tag_for(fleet: Fleet, key: Tuple[str, str], now: float, redact_on: bool) -> Tuple[str, str, str]:
+def tag_for(fleet: Fleet, key: tuple[str, str], now: float, redact_on: bool) -> tuple[str, str, str]:
     """(name, one-word status, state) for the always-on screen tags in kiosk mode."""
     sid, aid = key
     s = fleet.sessions.get(sid)

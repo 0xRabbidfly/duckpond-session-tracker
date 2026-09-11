@@ -3,9 +3,8 @@ from __future__ import annotations
 
 import json
 import re
-from typing import Tuple
 
-RGBA = Tuple[float, float, float, float]
+RGBA = tuple[float, float, float, float]
 
 HARNESS_COLORS = {
     "claude_code": "#D97757",
@@ -128,7 +127,8 @@ def hex_to_rgba(h: str, alpha: float = 1.0) -> RGBA:
     h = h.lstrip("#")
     r, g, b = (int(h[i:i + 2], 16) / 255.0 for i in (0, 2, 4))
     # sRGB -> linear so viewport colours match the hex
-    lin = lambda c: c / 12.92 if c <= 0.04045 else ((c + 0.055) / 1.055) ** 2.4
+    def lin(c: float) -> float:
+        return c / 12.92 if c <= 0.04045 else ((c + 0.055) / 1.055) ** 2.4
     return (lin(r), lin(g), lin(b), alpha)
 
 

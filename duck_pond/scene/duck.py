@@ -4,10 +4,10 @@ from __future__ import annotations
 import bpy
 from mathutils import Vector
 
+from ..theme import HAT_COLORS, harness_color, hat_for_model
 from . import materials as M
 from . import meshes as MS
 from . import pool as P
-from ..theme import HAT_COLORS, harness_color, hat_for_model
 
 SESSION_SCALE = 1.6
 DUCKLING_SCALE = SESSION_SCALE * 0.45

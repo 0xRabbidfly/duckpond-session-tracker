@@ -3,7 +3,6 @@ from __future__ import annotations
 import math
 import random
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Tuple
 
 from mathutils import Euler, Vector, noise
 
@@ -53,7 +52,7 @@ class Personality:
     curiosity: float = 0.0    # how much it turns toward the camera while waiting
 
 
-def personality_for(key: Tuple[str, str]) -> Personality:
+def personality_for(key: tuple[str, str]) -> Personality:
     h = abs(hash(key[0] + "|" + key[1]))
     r = [(h >> (8 * i)) & 0xFF for i in range(5)]
     return Personality(
@@ -122,7 +121,7 @@ def _room(x: float, y: float, lx: float, ly: float, xr, yr) -> float:
     return room
 
 
-def _wall_steer(st: "MState", xr, yr) -> Tuple[float, float]:
+def _wall_steer(st: MState, xr, yr) -> tuple[float, float]:
     """Continuous avoidance of the pool ends (`xr`) and, when given, the lane ropes (`yr`).
 
     Every boundary the duck is closing on gets an urgency that grows linearly from zero at
@@ -184,16 +183,16 @@ def _bump(now: float, at: float, dur: float, height: float) -> float:
 
 class Motion:
     def __init__(self) -> None:
-        self.states: Dict[Tuple[str, str], MState] = {}
-        self.follow: Optional[Tuple[str, str]] = None
+        self.states: dict[tuple[str, str], MState] = {}
+        self.follow: tuple[str, str] | None = None
         self.redact = True
         self.fx = None          # scene.fx.FX, set by the runtime (optional)
         self.night = 0.0        # 0..1 from the sky, for the glow
-        self.pinned: Optional[Tuple[str, str]] = None
+        self.pinned: tuple[str, str] | None = None
         self._dt = 1.0 / 30.0
 
     # ------------------------------------------------------------ helpers
-    def state_for(self, key, lane_y: Tuple[float, float], near: Optional[Vector] = None) -> MState:
+    def state_for(self, key, lane_y: tuple[float, float], near: Vector | None = None) -> MState:
         st = self.states.get(key)
         if st is None:
             if near is not None:
@@ -214,9 +213,9 @@ class Motion:
         return Vector((st.x, st.y, st.z)) + rot @ (local * scale)
 
     # ------------------------------------------------------------ main step
-    def step(self, fleet, ducks, tethers, lanes, ripples, cam, now: float, dt: float) -> List[Tuple[str, str]]:
+    def step(self, fleet, ducks, tethers, lanes, ripples, cam, now: float, dt: float) -> list[tuple[str, str]]:
         """Returns keys of ducklings whose despawn animation finished."""
-        finished: List[Tuple[str, str]] = []
+        finished: list[tuple[str, str]] = []
         self._dt = dt
         for s in list(fleet.sessions.values()):
             key = (s.id, "")
@@ -234,7 +233,7 @@ class Motion:
             for idx, sub in enumerate(top):
                 self._step_duckling(s, st, pscale, sub, idx, len(top), ducks, tethers, lane_y, ripples, cam, now, dt, finished)
             nested = [a for a in live_subs if a not in top]
-            by_parent: Dict[str, List] = {}
+            by_parent: dict[str, list] = {}
             for a in nested:
                 by_parent.setdefault(a.parent_agent_id, []).append(a)
             for pid, group in by_parent.items():
@@ -371,7 +370,7 @@ class Motion:
             g = max(g, 0.35)
         return g
 
-    def _beacon(self, d, agent, now: float, st: Optional[MState] = None, ripples=None, alpha: float = 1.0) -> None:
+    def _beacon(self, d, agent, now: float, st: MState | None = None, ripples=None, alpha: float = 1.0) -> None:
         """Traffic light per duck: lamp on the pole + halo on the water, both in the state colour.
         working = steady teal · waiting = breathing yellow (quiet after 10 min) · blocked = flashing red
         · idle = dim grey · error = a red flash over whatever it was."""
