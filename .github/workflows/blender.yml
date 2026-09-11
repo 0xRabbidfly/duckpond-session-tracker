@@ -30,11 +30,11 @@ jobs:
     name: headless tests
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Cache Blender
         id: cache
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ~/blender
           key: blender-${{ env.BLENDER_VERSION }}-linux-x64
@@ -64,7 +64,7 @@ jobs:
 
       - name: Upload renders
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: smoke-renders
           path: out/*.png
