@@ -1,0 +1,8 @@
+out/
+__pycache__/
+*.pyc
+*.blend1
+dist/
+build/
+*.spec
+DuckPond.exe
