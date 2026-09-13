@@ -78,7 +78,9 @@ def _mix(agent, now: float) -> list[tuple[str, int, str]]:
     return out
 
 
-def session_card(s: Session, now: float, redact_on: bool) -> Card:
+def session_card(s: Session, now: float, redact_on: bool, usd: float | None = None) -> Card:
+    """`usd` is the ledger's estimate for the session (sub-agents included); the recorded
+    cost-state total, when Claude Code wrote one, is shown beside it."""
     folder = (s.cwd or "").replace(chr(92), "/").rstrip("/").split("/")[-1] or "(no cwd)"
     card = Card(
         title=redact(s.display_name, redact_on, 60),
@@ -92,8 +94,12 @@ def session_card(s: Session, now: float, redact_on: bool) -> Card:
         inferred=s.state_confidence != "exact",
     )
     lines = card.lines
+    if usd is None:
+        spend = f"${s.cost_usd:.2f}"
+    else:
+        spend = f"≈${usd:.2f}" + (f" · recorded ${s.cost_usd:.2f}" if s.cost_usd else "")
     lines.append(f"turns {s.turns} · tokens {fmt_tokens(s.tokens_in)} in / {fmt_tokens(s.tokens_out)} out · "
-                 f"${s.cost_usd:.2f}" + (f" · +{s.lines_added} −{s.lines_removed} lines" if s.lines_added or s.lines_removed else ""))
+                 f"{spend}" + (f" · +{s.lines_added} −{s.lines_removed} lines" if s.lines_added or s.lines_removed else ""))
     if s.current_tool:
         lines.append("now: " + redact(s.current_tool, redact_on, 90))
     elif s.thinking and s.state == "generating":
@@ -173,10 +179,10 @@ def card_for(fleet: Fleet, kind: str, key: tuple[str, str] | None, now: float, r
     if not s:
         return None
     if kind in ("duck", "hat", "label") and not aid:
-        return session_card(s, now, redact_on)
+        return session_card(s, now, redact_on, fleet.ledger.session_usd(sid))
     sub = s.subagents.get(aid)
     if not sub:
-        return session_card(s, now, redact_on)
+        return session_card(s, now, redact_on, fleet.ledger.session_usd(sid))
     if kind == "tether":
         return tether_card(s, sub, now, redact_on)
     return subagent_card(s, sub, now, redact_on)
@@ -234,4 +240,4 @@ def totals_line(fleet: Fleet, now: float) -> str:
     t = fleet.totals(now)
     blocked = f" · {t['blocked']} blocked" if t["blocked"] else ""
     return (f"{t['ducks']} ducks · {t['ducklings']} ducklings · {t['active']} active · {t['waiting']} waiting{blocked} · "
-            f"{fmt_tokens(t['tokens_per_min'])} tok/min · ${t['cost_usd']:.2f}")
+            f"{fmt_tokens(t['tokens_per_min'])} tok/min · ≈${fleet.ledger.today(now).usd:.2f} today")

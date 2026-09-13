@@ -46,15 +46,61 @@ def _first_line_ts(path: str) -> float:
     return 0.0
 
 
-def _usage_event(sid: str, aid: str, usage: dict, at: float) -> dict:
-    inp = int(usage.get("input_tokens") or 0)
+def _usage_tokens(usage: dict) -> dict:
+    """The billed token counts of one reply, cache writes split by TTL (all 5-minute when unsplit)."""
     cc = int(usage.get("cache_creation_input_tokens") or 0)
-    cr = int(usage.get("cache_read_input_tokens") or 0)
-    out = int(usage.get("output_tokens") or 0)
+    split = usage.get("cache_creation") if isinstance(usage.get("cache_creation"), dict) else {}
+    cw1 = min(cc, int(split.get("ephemeral_1h_input_tokens") or 0))
     return {
-        "type": "Usage", "session_id": sid, "agent_id": aid, "at": at,
-        "tokens_in": inp + cc, "tokens_out": out, "context_used": inp + cc + cr + out,
+        "tokens_in": int(usage.get("input_tokens") or 0), "cache_write_5m": cc - cw1, "cache_write_1h": cw1,
+        "cache_read": int(usage.get("cache_read_input_tokens") or 0), "tokens_out": int(usage.get("output_tokens") or 0),
+        "speed": str(usage.get("speed") or ""),
     }
+
+
+def _reply_key(o: dict, msg: dict) -> str:
+    """One API reply is often written as several lines repeating its usage: they share this key."""
+    return f"{msg['id']}:{o.get('requestId') or ''}" if msg.get("id") else ""
+
+
+def _usage_event(sid: str, aid: str, usage: dict, at: float, model: str = "", key: str = "") -> dict:
+    t = _usage_tokens(usage)
+    tokens_in = t["tokens_in"] + t["cache_write_5m"] + t["cache_write_1h"]
+    return {
+        "type": "Usage", "session_id": sid, "agent_id": aid, "at": at, "model": model, "key": key,
+        "tokens_in": tokens_in, "tokens_out": t["tokens_out"], "context_used": tokens_in + t["cache_read"] + t["tokens_out"],
+        "cache_write_5m": t["cache_write_5m"], "cache_write_1h": t["cache_write_1h"], "cache_read": t["cache_read"],
+        "speed": t["speed"],
+    }
+
+
+def _usage_rows(path: str, sid: str, aid: str) -> list[dict]:
+    """Ledger rows for every reply in one transcript. Lines without a timestamp are skipped."""
+    rows: list[dict] = []
+    cwd = ""
+    try:
+        with open(path, "rb") as fh:
+            for raw in fh:
+                if b'"usage"' not in raw and (cwd or b'"cwd"' not in raw):
+                    continue
+                try:
+                    o = json.loads(raw)
+                except ValueError:
+                    continue
+                if not isinstance(o, dict):
+                    continue
+                cwd = o.get("cwd") or cwd
+                msg = o.get("message")
+                if o.get("type") != "assistant" or not isinstance(msg, dict) or not isinstance(msg.get("usage"), dict):
+                    continue
+                at = _ts(o, 0.0)
+                if not at:
+                    continue
+                rows.append({"at": at, "session_id": sid, "agent_id": aid, "cwd": cwd, "model": msg.get("model") or "",
+                             "key": _reply_key(o, msg), **_usage_tokens(msg["usage"])})
+    except OSError:
+        return []
+    return rows
 
 
 class _TranscriptParser:
@@ -83,7 +129,7 @@ class _TranscriptParser:
                 self.model = model
                 ev.append({"type": "ModelChanged", "model": model, **base})
             if isinstance(msg.get("usage"), dict):
-                ev.append(_usage_event(self.sid, self.aid, msg["usage"], at))
+                ev.append(_usage_event(self.sid, self.aid, msg["usage"], at, model, _reply_key(o, msg)))
             if o.get("effort") and o.get("effort") != self.effort:
                 self.effort = str(o["effort"])
                 ev.append({"type": "Effort", "effort": self.effort, **base})
@@ -259,6 +305,23 @@ class ClaudeCodeAdapter(Adapter):
                 out.append(path)
         return out
 
+    def backfill(self, now: float) -> list[dict]:
+        """Usage from every transcript still on disk (Claude Code keeps ~30 days), one UsageBatch
+        per file. Only the ledger reads these, so spend survives ducks leaving and restarts."""
+        out = []
+        sessions = glob.glob(os.path.join(self.projects_dir, "*", "*.jsonl"))
+        subagents = glob.glob(os.path.join(self.projects_dir, "*", "*", "subagents", "agent-*.jsonl"))
+        for path in sessions + subagents:
+            if path in subagents:
+                sid = os.path.basename(os.path.dirname(os.path.dirname(path)))
+                aid = os.path.basename(path)[len("agent-"):-len(".jsonl")]
+            else:
+                sid, aid = os.path.splitext(os.path.basename(path))[0], ""
+            rows = _usage_rows(path, sid, aid)
+            if rows:
+                out.append({"type": "UsageBatch", "rows": rows, "at": now})
+        return out
+
     def _subagent_files(self, session_path: str) -> list[str]:
         d = os.path.join(os.path.splitext(session_path)[0], "subagents")
         if not os.path.isdir(d):
@@ -288,6 +351,8 @@ class ClaudeCodeAdapter(Adapter):
                         "type": "SessionSeen", "session_id": sid, "harness": HARNESS,
                         "cwd": o.get("cwd", ""), "branch": o.get("gitBranch", ""),
                         "started_at": _ts(o, now), "at": _ts(o, now), "transcript_path": path,
+                        # claude -p / Agent SDK: a one-shot run (often a scheduled job) nobody answers
+                        "headless": o.get("entrypoint") == "sdk-cli",
                     })
                 if sid in self.seen_sessions:
                     events.extend(parser.parse(o, now))

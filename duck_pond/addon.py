@@ -7,6 +7,7 @@ import bpy
 
 from .adapters.claude_code import ClaudeCodeAdapter
 from .adapters.stub import StubAdapter
+from .ledger import RANGE_ORDER, RANGES
 from .runtime import RT
 from .scene import pool as P
 from .theme import parse_overrides
@@ -85,6 +86,14 @@ def _on_clock(self, context):
     RT.sky.clock_override = None if self.clock_override < 0 else float(self.clock_override)
 
 
+def _on_board_range(self, context):
+    RT.set_board_range(self.board_range)
+
+
+def _on_legend(self, context):
+    RT.show_legend = self.legend
+
+
 class DuckPondSettings(bpy.types.PropertyGroup):
     use_claude: bpy.props.BoolProperty(name="Claude Code (live)", default=True)
     use_stub: bpy.props.BoolProperty(name="Demo fixture", default=False)
@@ -101,6 +110,11 @@ class DuckPondSettings(bpy.types.PropertyGroup):
                                   description="Soft synthesised cues: prompt, report, question, error, tests")
     clock_override: bpy.props.FloatProperty(name="Clock (h, -1 = real)", default=-1.0, min=-1.0, max=24.0,
                                             update=_on_clock, description="Force the time of day for the sky and lido lights")
+    board_range: bpy.props.EnumProperty(name="Range", items=[(r, r, RANGES[r][1]) for r in RANGE_ORDER], default="hour",
+                                        update=_on_board_range,
+                                        description="Scoreboard bars and its 'this range' line (T cycles; click a tab on the board)")
+    legend: bpy.props.BoolProperty(name="Legend", default=True, update=_on_legend,
+                                   description="On-screen key: halo colour = state, body colour = tool, hat = model (H)")
 
 
 def build_adapters(props=None):
@@ -135,6 +149,7 @@ class DUCKPOND_OT_start(bpy.types.Operator):
         RT.start(adapters)
         RT.director.enabled = props.director
         RT.tags_for_all = props.tags_for_all
+        RT.set_board_range(props.board_range)
         _on_sound(props, context)
         _on_clock(props, context)
         return {"FINISHED"}

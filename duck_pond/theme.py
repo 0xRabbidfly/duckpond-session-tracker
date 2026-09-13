@@ -49,6 +49,17 @@ HAT_COLORS = {
     "newspaper": "#E8E4D8",
 }
 
+# hat -> who wears it, for the on-screen key (HAT_MAP maps several patterns to one hat)
+HAT_LEGEND = [
+    ("wizard", "Fable"),
+    ("top_hat", "Opus"),
+    ("beret", "Sonnet"),
+    ("kasa", "Haiku"),
+    ("cap", "GPT / Codex"),
+    ("propeller", "Gemini"),
+    ("newspaper", "any other model"),
+]
+
 MODEL_LABELS = [
     ("claude-fable-5-1", "Fable 5.1"),
     ("fable", "Fable"),
@@ -65,9 +76,9 @@ _unknown_models_logged = set()
 # ---------------------------------------------------------------- states (glance colours)
 # One colour per state, used by the beacon, the card's state bar and the name plate tint.
 STATE_COLORS = {
-    "generating": "#5EEAD4",          # teal: thinking / streaming
-    "tool_running": "#FFB347",        # amber: hands busy
-    "awaiting_user": "#FFD54F",       # yellow: your turn
+    "generating": "#5EEAD4",          # teal: working (thinking / streaming)
+    "tool_running": "#5EEAD4",        # teal too: working; the tool chip says which tool (amber read as yellow)
+    "awaiting_user": "#FFC400",       # saturated yellow: your turn (pale yellow washed out on the water)
     "awaiting_permission": "#FF3B30", # red: blocked on you
     "idle": "#8A93A6",                # grey
     "ended": "#5B6270",

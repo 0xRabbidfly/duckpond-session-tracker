@@ -188,6 +188,51 @@ def apply_viewport_settings(scene) -> None:
             pass
 
 
+# ---------------------------------------------------------------- text badges
+def _badge_mesh() -> bpy.types.Mesh:
+    me = bpy.data.meshes.get("DP_Badge")
+    if me is None:
+        me = bpy.data.meshes.new("DP_Badge")
+        me.from_pydata([(-0.5, -0.5, 0.0), (0.5, -0.5, 0.0), (0.5, 0.5, 0.0), (-0.5, 0.5, 0.0)], [], [(0, 1, 2, 3)])
+        me.materials.append(M.flat_material("Badge", "#0B0F14", roughness=0.9))
+    return me
+
+
+def add_badge(text_obj: bpy.types.Object) -> bpy.types.Object:
+    """A dark plate behind screen-aligned white text, so a name reads the same over water, the
+    white deck and other ducks. A child of the text, so it shares its billboard rotation and
+    hover properties. Size it with fit_badge once the text has a body."""
+    plate = new_object(text_obj.name + "_badge", _badge_mesh())
+    plate.parent = text_obj
+    for k in ("dp_kind", "dp_session_id", "dp_agent_id"):
+        if k in text_obj:
+            plate[k] = text_obj[k]
+    plate.hide_viewport = True
+    plate.hide_render = True
+    text_obj["dp_badge"] = plate.name
+    return plate
+
+
+def fit_badge(text_obj: bpy.types.Object, pad: float = 0.3) -> None:
+    """Size the badge to the text's evaluated bounds plus `pad` × font size. Evaluates the
+    depsgraph, so call it from a timer, never from a frame-change handler."""
+    plate = bpy.data.objects.get(text_obj.get("dp_badge", ""))
+    if plate is None:
+        return
+    show = bool(text_obj.data.body.strip()) and not text_obj.hide_viewport
+    if plate.hide_viewport == show:
+        plate.hide_viewport = not show
+        plate.hide_render = not show
+    if not show:
+        return
+    ev = text_obj.evaluated_get(bpy.context.evaluated_depsgraph_get())
+    xs = [c[0] for c in ev.bound_box]
+    ys = [c[1] for c in ev.bound_box]
+    p = text_obj.data.size * pad
+    plate.location = ((min(xs) + max(xs)) / 2, (min(ys) + max(ys)) / 2, -0.05 * text_obj.data.size)
+    plate.scale = (max(xs) - min(xs) + 2 * p, max(ys) - min(ys) + 1.4 * p, 1.0)
+
+
 # ---------------------------------------------------------------- lanes
 LANE_LINGER_S = 180.0  # a lane outlives its last session this long before the pool re-spaces
 
@@ -245,21 +290,10 @@ class Lanes:
                 pass
         self.objects = []
         rope_mat = M.lane_rope_material()
-        cam = camera()
         for i, key in enumerate(self.keys):
             if i > 0:
                 rope = new_object(f"DP_LaneRope_{i}", MS.lane_rope_mesh(POOL_X, rope_mat))
                 rope.location = (0, i * w, WATER_Z + 0.02)
                 rope.color = hex_to_rgba("#E53935" if i % 2 else "#FAFAFA")
                 self.objects.append(rope)
-            label = key.replace("\\", "/").rstrip("/").split("/")[-1] or key
-            cu = bpy.data.curves.new(f"DP_LaneSign_{i}", "FONT")
-            cu.body = label
-            cu.size = 0.32
-            cu.align_x = "CENTER"
-            cu.materials.append(M.text_material())
-            sign = new_object(f"DP_LaneSign_{i}", cu)
-            sign.location = (-1.3, i * w + w / 2, 0.45)
-            c = sign.constraints.new("COPY_ROTATION")  # screen-aligned, like the duck labels
-            c.target = cam
-            self.objects.append(sign)
+            # the lane's name, branches, sessions and spend live on one sign: deck.LaneSigns

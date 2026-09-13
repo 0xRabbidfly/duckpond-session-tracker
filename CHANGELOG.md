@@ -14,8 +14,36 @@ All notable changes to Duck Pond are recorded here. The format follows
   the default install folder and then to `blender` on PATH.
 - `python dev\build_exe.py --launch` rebuilds the executable, refreshes every copy and
   relaunches the pool in kiosk mode with sound.
+- Usage ledger (`duck_pond/ledger.py`, `duck_pond/pricing.py`): every reply's tokens priced at
+  API list rates (≈$), read from all transcripts on disk at startup and followed live. Spend no
+  longer drops when ducks leave the pool or when Duck Pond restarts.
+- Scoreboard range picker: `min` `hour` `day` `week` `month` tabs (click, or `T`; also in the
+  sidebar). The board shows the picked range's spend, output tokens and sessions, the month so
+  far on a fixed line, and ≈$ bars for the range with their peak.
 
 ### Changed
+- App and kiosk mode no longer look *through* the pool camera: the viewport copies it every
+  frame, so the pool fills the window with no dashed camera frame or darkened border.
+- Clicking a duck, duckling or tether pins its card and tag until a click lands elsewhere in
+  the pool. The click casts where it lands, so a swimming duck no longer slips out from under
+  it; clicking the pinned duck again keeps it pinned, and sidebar clicks never unpin.
+- App and kiosk mode: an on-screen key (top right, `H` or the sidebar toggles it) explains halo
+  colour = state, body colour = tool and hat = model.
+- Headless runs (`claude -p` / Agent SDK, `entrypoint: sdk-cli`, e.g. scheduled jobs that start
+  in `C:\Windows\System32`) send their report up and leave when their turn ends, instead of
+  sitting in the pool as "waiting for you" for 30 minutes.
+- States read at a glance: working is teal whether writing or running a tool (the chip names the
+  tool); waiting is a saturated yellow; idle ducks have no lamp or halo and turn grey and
+  see-through. The halo glows less, so the default AgX view no longer washes its colour to cream.
+- Duck names and branch flags sit on dark badges (white text over the white deck was
+  unreadable); names are half the size (0.2 m) and cut at 24 characters; ducks are 15 % smaller.
+- Lane signs are one screen-aligned plate per lane: folder name on top, branch · sessions · ≈$
+  under it, session dots below, coins beside it. The separate floating folder name, which
+  covered the details, is gone.
+- A reply written as several transcript lines is counted once. `tok/min`, session token counts
+  and the sparkline were inflated before.
+- Lane signs show the folder's ≈$ this month; hover cards show the session's ≈$ (sub-agents
+  included) beside the recorded `cost-state` total; the card footer shows ≈$ today.
 - Lint clean under ruff (`E F W I B UP`); typing annotations modernised to PEP 585/604.
 - README screenshots live in `docs/media/` so they render on GitHub.
 

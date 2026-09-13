@@ -9,12 +9,13 @@ from . import materials as M
 from . import meshes as MS
 from . import pool as P
 
-SESSION_SCALE = 1.6
+SESSION_SCALE = 1.35
 DUCKLING_SCALE = SESSION_SCALE * 0.45
 # Text is sized in WORLD metres (the objects are parented to a scaled duck, so the curve size
-# is divided by that scale): glyph heights readable from the overview camera.
-LABEL_H_DUCK = 0.42
-LABEL_H_DUCKLING = 0.2
+# is divided by that scale): glyph heights readable from the overview camera without names from
+# neighbouring ducks running into each other (ducks in a lane sit ~1.6 m apart).
+LABEL_H_DUCK = 0.2
+LABEL_H_DUCKLING = 0.13
 FLAG_H = 0.15
 BUBBLE_H = 0.45
 
@@ -94,18 +95,20 @@ class DuckObj:
         if not duckling:
             # the branch flag flies over the tail, screen-aligned like the name so it reads
             # left to right whichever way the duck is heading
-            self.flag = _text_object(f"{name}_flag", branch or "", FLAG_H / s, billboard=True, outline=True)
+            self.flag = _text_object(f"{name}_flag", branch or "", FLAG_H / s, billboard=True)
             self.flag.parent = self.obj
             self.flag.location = MS.TAIL_TIP + Vector((0.0, 0.0, 0.16))
+            P.add_badge(self.flag)
         self.label = _text_object(f"{name}_label", "", (LABEL_H_DUCKLING if duckling else LABEL_H_DUCK) / s,
-                                  billboard=True, outline=True)
+                                  billboard=True)
         self.label.parent = self.obj
         self.label.location = MS.HEAD_TOP + Vector((0.0, 0.0, 0.62 if duckling else 0.74))
-        for o in (self.label, bpy.data.objects[self.label["dp_outline"]]):
-            o["dp_kind"] = "label"
-            o["dp_session_id"] = session_id
-            o["dp_agent_id"] = agent_id
+        self.label["dp_kind"] = "label"
+        self.label["dp_session_id"] = session_id
+        self.label["dp_agent_id"] = agent_id
+        P.add_badge(self.label)  # white on a dark badge: legible over water, deck and ducks
         self.label_text = ""
+        self.badges_dirty = True
         # the state halo: a ring on the water in the state colour (teal working, yellow waiting,
         # red blocked, grey idle). Replaces the "?" / "!" glyphs, which read the same in every state.
         self.halo = P.new_object(f"{name}_halo", MS.halo_mesh(M.halo_material()))
@@ -217,19 +220,32 @@ class DuckObj:
         if text != self.label_text:
             self.label_text = text
             _set_body(self.label, text)
+            self.badges_dirty = True
 
     def set_world_label_visible(self, show: bool) -> None:
         """Hidden while a screen-space tag names this duck (kiosk tags, hover, pin)."""
         if self.label.hide_viewport != (not show):
             self.label.hide_viewport = not show
-            out = bpy.data.objects.get(self.label.get("dp_outline", ""))
-            if out is not None:
-                out.hide_viewport = not show
-
+            badge = bpy.data.objects.get(self.label.get("dp_badge", ""))
+            if badge is not None:
+                badge.hide_viewport = not show or not self.label_text.strip()
+                badge.hide_render = badge.hide_viewport
+            self.badges_dirty = True
 
     def set_flag(self, text: str) -> None:
-        if self.flag:
+        if self.flag and self.flag.data.body != text:
             _set_body(self.flag, text)
+            self.badges_dirty = True
+
+    def fit_badges(self) -> None:
+        """Resize the name and branch badges after their text changed. Runs from the data timer:
+        fitting evaluates the depsgraph, which a frame-change handler must not do."""
+        if not self.badges_dirty:
+            return
+        self.badges_dirty = False
+        for o in (self.label, self.flag):
+            if o is not None:
+                P.fit_badge(o)
 
     def set_halo(self, color) -> None:
         """RGBA; alpha 0 hides it."""
@@ -260,8 +276,8 @@ class DuckObj:
 
     def remove(self) -> None:
         texts = [o for o in (self.flag, self.label) if o is not None]
-        outlines = [bpy.data.objects.get(o.get("dp_outline", "")) for o in texts]
-        for o in outlines + texts + [self.hat, self.lifering, self.pole, self.beacon, self.halo] + self.trays + [self.obj]:
+        extras = [bpy.data.objects.get(o.get(k, "")) for o in texts for k in ("dp_outline", "dp_badge")]
+        for o in extras + texts + [self.hat, self.lifering, self.pole, self.beacon, self.halo] + self.trays + [self.obj]:
             if o is None:
                 continue
             try:

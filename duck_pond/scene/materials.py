@@ -316,7 +316,9 @@ def halo_material() -> bpy.types.Material:
     nt.links.new(info.outputs["Color"], bsdf.inputs["Emission Color"])
     if "Alpha" in info.outputs:
         nt.links.new(info.outputs["Alpha"], bsdf.inputs["Alpha"])
-    _set(bsdf, "Emission Strength", 2.2)
+    # Low on purpose: the scene uses Blender's default AgX view, which pushes bright emission toward
+    # white, and at 2.2 a yellow "waiting" halo rendered cream and teal went pale.
+    _set(bsdf, "Emission Strength", 0.7)
     _set(bsdf, "Roughness", 0.6)
     _blended(mat)
     return mat

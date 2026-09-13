@@ -79,6 +79,30 @@ def test_claude_adapter_real_logs():
     assert len(again) < 50, f"poll keeps emitting: {len(again)} events"
 
 
+def test_backfill_real_logs():
+    d = os.path.expanduser("~/.claude/projects")
+    if not os.path.isdir(d):
+        print("  (skipped: no ~/.claude/projects)")
+        return
+    t0 = time.time()
+    evs = ClaudeCodeAdapter(d).backfill(t0)
+    f = Fleet()
+    for ev in evs:
+        f.apply(ev)
+    f.apply({"type": "BackfillDone"})
+    dt = time.time() - t0
+    now = time.time()
+    rows = sum(len(e["rows"]) for e in evs)
+    day, mtd = f.ledger.range_stats("day", now), f.ledger.month_to_date(now)
+    print(f"  files={len(evs)} rows={rows} last 30 days ≈${day.usd:,.2f} ({day.sessions} sessions, +? {day.unpriced}) "
+          f"month-to-date ≈${mtd.usd:,.2f} in {dt:.2f}s")
+    assert all(e["type"] == "UsageBatch" for e in evs)
+    assert not f.sessions, "backfill creates no ducks"
+    assert f.ledger.ready
+    if rows:
+        assert day.usd > 0 and day.sessions > 0
+
+
 def test_housekeeping():
     f = Fleet()
     now = 1000.0

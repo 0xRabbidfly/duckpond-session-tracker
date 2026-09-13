@@ -72,25 +72,14 @@ def _style_viewport(space, kiosk: bool):
     space.region_3d.view_perspective = "CAMERA"
 
 
-def _fit_camera():
-    for window in bpy.context.window_manager.windows:
-        for area in window.screen.areas:
-            if area.type == "VIEW_3D":
-                region = next((r for r in area.regions if r.type == "WINDOW"), None)
-                try:
-                    with bpy.context.temp_override(window=window, screen=window.screen, area=area, region=region):
-                        bpy.ops.view3d.view_center_camera()
-                except Exception as exc:  # noqa: BLE001
-                    print("[duck_pond] fit camera:", exc)
-                return None
-    return None
-
-
 def _go():
     adapters = duck_pond.build_adapters(props)
     duck_pond.RT.start(adapters)
     duck_pond.RT.director.enabled = props.director
     duck_pond.RT.tags_for_all = props.tags_for_all
+    # app mode: the viewport copies the pool camera instead of looking through it, so the pool
+    # fills the window with no camera frame around it
+    duck_pond.RT.view_locked = APP_MODE
     if props.sound:
         from duck_pond.sound import Sound
         duck_pond.RT.sound = Sound()
@@ -105,10 +94,11 @@ def _go():
                             bpy.ops.screen.screen_full_area(use_hide_panels=True)
                             if FULLSCREEN:
                                 bpy.ops.wm.window_fullscreen_toggle()
-                            bpy.app.timers.register(_fit_camera, first_interval=0.5)
                     except Exception as exc:  # noqa: BLE001
                         print("[duck_pond] app mode layout:", exc)
                 break
+    if APP_MODE:
+        duck_pond.RT.lock_views()
     return None
 
 

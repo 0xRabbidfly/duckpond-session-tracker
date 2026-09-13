@@ -7,9 +7,10 @@ import time
 import traceback
 
 import bpy
-from mathutils import Vector
+from mathutils import Matrix, Vector
 
 from .adapters.base import Adapter
+from .ledger import RANGE_ORDER
 from .model import Fleet
 from .scene import pool as P
 from .scene.deck import LaneSigns, Scoreboard
@@ -50,6 +51,9 @@ class Runtime:
         self.director = Director()
         self.sound = None  # set by the addon when enabled (sound.Sound)
         self.tags_for_all = False  # kiosk: screen-space name tags on every duck
+        self.view_locked = False  # app mode: viewports copy DP_Camera every frame (see lock_views)
+        self.board_range = "hour"  # scoreboard bars and 'this range' line: min | hour | day | week | month
+        self.show_legend = True  # on-screen key: halo = state, body = tool, hat = model (H)
         self.running = False
         self.paused = False
         self.last_frame_t = 0.0
@@ -90,7 +94,9 @@ class Runtime:
         self.status = "running: " + ", ".join(a.describe() for a in adapters)
         gui = (not bpy.app.background) if gui is None else gui
         if gui and self.threaded:
-            self._start_worker()
+            self._start_worker()  # the worker backfills the ledger before it polls
+        else:
+            self._backfill(self.fleet.apply)
         if gui:
             if not bpy.app.timers.is_registered(_timer):
                 bpy.app.timers.register(_timer, first_interval=0.1, persistent=True)
@@ -157,7 +163,20 @@ class Runtime:
             self._worker.join(timeout=2.0)
         self._worker = None
 
+    def _backfill(self, sink) -> None:
+        """Past usage for the ledger, once, before live polling (a month of transcripts reads in ~1 s).
+        BackfillDone is sent even when an adapter fails, so the board stops saying 'scanning logs'."""
+        for a in self.adapters:
+            try:
+                for ev in a.backfill(time.time()):
+                    sink(ev)
+            except Exception:
+                self.last_error = traceback.format_exc(limit=3)
+                print("[duck_pond] backfill error:", self.last_error)
+        sink({"type": "BackfillDone"})
+
     def _worker_loop(self) -> None:
+        self._backfill(self._queue.put)
         while not self._worker_stop.is_set():
             if not self.paused:
                 self._poll_adapters(time.time(), self._queue.put)
@@ -201,7 +220,11 @@ class Runtime:
                 self.motion.ripple_for(key, self.ducks, self.ripples, big=True)
             else:
                 d.set_hat(s.model)
-                d.set_color((*harness_color(s.harness, self.color_overrides)[:3], d.obj.color[3]))
+                rgb = harness_color(s.harness, self.color_overrides)[:3]
+                if s.state == "idle":  # drain most of the colour: idle reads at a glance, not by halo
+                    grey = sum(rgb) / 3.0
+                    rgb = tuple(grey + (c - grey) * 0.25 for c in rgb)
+                d.set_color((*rgb, d.obj.color[3]))
             for sub in s.subagents.values():
                 skey = (s.id, sub.id)
                 if skey not in self.ducks and not sub.done:
@@ -211,6 +234,8 @@ class Runtime:
                     self.motion.ripple_for(key, self.ducks, self.ripples, big=True)
                 elif skey in self.ducks:
                     self.ducks[skey].set_hat(sub.model or s.model)
+        for d in self.ducks.values():
+            d.fit_badges()  # here in the timer, not in the frame handler: fitting evaluates the depsgraph
         # cues
         for cue in self.fleet.drain_cues():
             key = (cue.session_id, cue.agent_id or "")
@@ -246,7 +271,7 @@ class Runtime:
             self._remove_key(key)
         # the world and the deck
         self.sky.tick(self.fleet, now)
-        self.board.update(self.fleet, now)
+        self.board.update(self.fleet, now, self.board_range)
         self.signs.update(self.lanes, self.fleet, now, self.redact)
 
     def _duck_pos(self, key: Key):
@@ -354,6 +379,42 @@ class Runtime:
         self.sky.update(now, dt)
         if self.director.enabled and self.motion.follow is None:
             self.director.step(self.fleet, self.ducks, self.lanes, cam, now, dt)
+        if self.view_locked and not bpy.app.background:
+            self.lock_views(cam)
+
+    def lock_views(self, cam=None) -> None:
+        """Every 3D viewport sees exactly what DP_Camera sees, as a plain perspective view that
+        fills the window. Looking *through* the camera would draw Blender's dashed camera frame
+        and darken everything outside it."""
+        cam = cam or P.get("DP_Camera")
+        if cam is None:
+            return
+        view = Matrix.LocRotScale(cam.location, cam.rotation_euler.to_quaternion(), None).inverted()
+        # tangents of the camera's half field of view (sensor fit AUTO: the sensor spans the longer side)
+        render = bpy.context.scene.render
+        rw, rh = render.resolution_x * render.pixel_aspect_x, render.resolution_y * render.pixel_aspect_y
+        tan_long = cam.data.sensor_width / 2.0 / cam.data.lens
+        tan_w, tan_h = (tan_long, tan_long * rh / rw) if rw >= rh else (tan_long * rw / rh, tan_long)
+        for window in bpy.context.window_manager.windows:
+            for area in window.screen.areas:
+                if area.type != "VIEW_3D":
+                    continue
+                region = next((r for r in area.regions if r.type == "WINDOW"), None)
+                if region is None or region.width < 2 or region.height < 2:
+                    continue
+                space = area.spaces[0]
+                rv3d = space.region_3d
+                if rv3d.view_perspective != "PERSP":
+                    rv3d.view_perspective = "PERSP"
+                rv3d.view_matrix = view
+                # A free perspective view spans 36 mm over the longer side of the region at twice its lens
+                # (Blender's CAMERA_PARAM_ZOOM_INIT_PERSP). Take the longest lens that still shows the whole
+                # camera shot, so a window wider or taller than the render shows more pool, never less.
+                w, h = region.width, region.height
+                m = max(w, h)
+                space.lens = min(36.0 * w / (m * tan_w), 36.0 * h / (m * tan_h))
+                space.clip_start = cam.data.clip_start
+                space.clip_end = cam.data.clip_end
 
     # ------------------------------------------------------------ queries for UI
     def agent_for_object(self, obj) -> tuple[str, Key | None]:
@@ -363,6 +424,14 @@ class Runtime:
         if kind in ("duck", "duckling", "tether", "hat", "label") and "dp_session_id" in obj:
             return kind, (obj["dp_session_id"], obj["dp_agent_id"])
         return "", None
+
+    def set_board_range(self, name: str) -> None:
+        if name in RANGE_ORDER and name != self.board_range:
+            self.board_range = name
+            self.board.last_update = 0.0  # redraw on the next tick, not a second later
+
+    def next_board_range(self) -> str:
+        return RANGE_ORDER[(RANGE_ORDER.index(self.board_range) + 1) % len(RANGE_ORDER)]
 
     def toggle_follow(self) -> None:
         self.motion.follow = None if self.motion.follow else self.pinned

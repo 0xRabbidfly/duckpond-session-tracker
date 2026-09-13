@@ -10,6 +10,7 @@ Screen-space overlay rules (SPEC §7, reimagined):
 """
 from __future__ import annotations
 
+import math
 import time
 
 import blf
@@ -21,7 +22,7 @@ from mathutils import Vector
 
 from ..runtime import RT
 from ..scene import pool as P
-from ..theme import hex_to_rgba
+from ..theme import HARNESS_LABELS, HAT_COLORS, HAT_LEGEND, harness_color, hex_to_rgba
 from . import cards
 
 FONT = 0
@@ -31,6 +32,13 @@ TITLE_SIZE = 20
 TAG_SIZE = 26
 TAG_SIZE_SMALL = 15
 BG = (0.04, 0.05, 0.08, 0.86)
+# (state, word, hint) for the on-screen key; idle has no halo, so its swatch is an empty ring
+LEGEND_STATES = (
+    ("generating", "working", "writing or running a tool"),
+    ("awaiting_user", "waiting", "your turn"),
+    ("awaiting_permission", "blocked", "needs a permission"),
+    ("idle", "idle", "no halo, duck greyed out"),
+)
 
 
 class DUCKPOND_OT_hover(bpy.types.Operator):
@@ -40,6 +48,7 @@ class DUCKPOND_OT_hover(bpy.types.Operator):
 
     _handle = None
     _last_cast = 0.0
+    _hit = None  # the object under the last cast (original, not evaluated)
 
     def invoke(self, context, event):
         if context.area is None or context.area.type != "VIEW_3D":
@@ -68,8 +77,15 @@ class DUCKPOND_OT_hover(bpy.types.Operator):
                 self._last_cast = now
                 self._cast(context, event)
             return {"PASS_THROUGH"}
-        if event.type == "LEFTMOUSE" and event.value == "PRESS" and RT.hover:
-            RT.pinned = None if RT.pinned == RT.hover else RT.hover
+        if event.type == "LEFTMOUSE" and event.value == "PRESS" and self._over_pool(context, event):
+            # cast where the click landed: a swimming duck has usually left the last hover cast behind.
+            # A range tab on the scoreboard switches the range and leaves the pin alone. A duck,
+            # duckling or tether pins its card and tag; anywhere else in the pool releases it.
+            self._cast(context, event)
+            if self._hit is not None and self._hit.get("dp_kind") == "range_tab":
+                context.window_manager.duck_pond.board_range = self._hit["dp_range"]
+                return {"PASS_THROUGH"}
+            RT.pinned = RT.hover
             context.area.tag_redraw()
             return {"PASS_THROUGH"}
         if event.value == "PRESS" and not (event.ctrl or event.alt or event.oskey):
@@ -110,7 +126,26 @@ class DUCKPOND_OT_hover(bpy.types.Operator):
             if event.type == "S":
                 props.sound = not props.sound
                 return {"RUNNING_MODAL"}
+            if event.type == "T":
+                props.board_range = RT.next_board_range()
+                return {"RUNNING_MODAL"}
+            if event.type == "H":
+                props.legend = not props.legend
+                return {"RUNNING_MODAL"}
         return {"PASS_THROUGH"}
+
+    @staticmethod
+    def _over_pool(context, event) -> bool:
+        """The event is over the viewport itself, not a sidebar, toolbar or header drawn on top of it."""
+        region, area = context.region, context.area
+        if region is None or area is None:
+            return False
+        mx, my = event.mouse_x, event.mouse_y
+        if not (region.x <= mx < region.x + region.width and region.y <= my < region.y + region.height):
+            return False
+        return not any(r.type != "WINDOW" and r.width > 1 and r.height > 1
+                       and r.x <= mx < r.x + r.width and r.y <= my < r.y + r.height
+                       for r in area.regions)
 
     def _cast(self, context, event):
         region = context.region
@@ -120,12 +155,14 @@ class DUCKPOND_OT_hover(bpy.types.Operator):
         coord = (event.mouse_region_x, event.mouse_region_y)
         if not (0 <= coord[0] <= region.width and 0 <= coord[1] <= region.height):
             RT.hover = None
+            self._hit = None
             return
         origin = view3d_utils.region_2d_to_origin_3d(region, rv3d, coord)
         direction = view3d_utils.region_2d_to_vector_3d(region, rv3d, coord)
         depsgraph = context.evaluated_depsgraph_get()
         hit, _loc, _n, _i, obj, _m = context.scene.ray_cast(depsgraph, origin, direction)
-        kind, key = RT.agent_for_object(obj.original if hit and obj else None)
+        self._hit = obj.original if hit and obj else None
+        kind, key = RT.agent_for_object(self._hit)
         changed = key != RT.hover or kind != RT.hover_kind
         RT.hover, RT.hover_kind = key, kind
         if changed:
@@ -155,6 +192,8 @@ class DUCKPOND_OT_hover(bpy.types.Operator):
         if RT.director.enabled:
             footer += "   ·   DIRECTOR"
         self._draw_card(context, region, card, footer, key)
+        if RT.show_legend:
+            self._draw_legend(context, region)
         if RT.last_error:
             blf.size(FONT, 13)
             blf.color(FONT, 1.0, 0.4, 0.4, 1.0)
@@ -327,6 +366,64 @@ class DUCKPOND_OT_hover(bpy.types.Operator):
         blf.position(FONT, x + (bw - sw) / 2, y - sh - 4, 0)
         blf.draw(FONT, status)
         blf.size(FONT, 13)
+
+    # ------------------------------------------------------------ legend
+    def _draw_legend(self, context, region) -> None:
+        """Top-right key: halo colour = state, body colour = tool, hat = model. H hides it."""
+        rows = [("head", None, "HALO = STATE")]
+        for state, word, hint in LEGEND_STATES:
+            rows.append(("ring", None if state == "idle" else cards.state_rgba(state), f"{word}  ·  {hint}"))
+        rows.append(("head", None, "BODY COLOUR = TOOL"))
+        for harness, label in HARNESS_LABELS.items():
+            if harness != "unknown":
+                rows.append(("swatch", harness_color(harness, RT.color_overrides), label))
+        rows.append(("head", None, "HAT = MODEL"))
+        for kind, who in HAT_LEGEND:
+            rows.append(("swatch", hex_to_rgba(HAT_COLORS[kind]), f"{kind.replace('_', ' ')}  ·  {who}"))
+        rows.append(("foot", None, "H hides this key"))
+        blf.size(FONT, 13)
+        width = max(blf.dimensions(FONT, text)[0] for _, _, text in rows) + 2 * PAD + 24
+        height = len(rows) * LINE_H + 2 * PAD
+        ui_w = 0
+        if context.area:
+            ui_w = sum(r.width for r in context.area.regions if r.type == "UI" and r.width > 1)
+        x1 = region.width - ui_w - 24
+        x0 = x1 - width
+        y1 = region.height - 24
+        self._rect(x0, y1 - height, x1, y1, BG)
+        y = y1 - PAD - LINE_H + 5
+        for kind, rgba, text in rows:
+            x = x0 + PAD
+            if kind in ("head", "foot"):
+                blf.color(FONT, 0.6, 0.75, 0.85, 1.0) if kind == "head" else blf.color(FONT, 0.5, 0.55, 0.62, 1.0)
+                blf.position(FONT, x, y, 0)
+                blf.draw(FONT, text)
+                y -= LINE_H
+                continue
+            cx, cy = x + 7, y + 5
+            if kind == "ring":
+                if rgba is None:
+                    self._circle(cx, cy, 6, (0.6, 0.63, 0.7, 0.9), filled=False)
+                else:
+                    self._circle(cx, cy, 6, (rgba[0], rgba[1], rgba[2], 1.0))
+            else:
+                self._rect(cx - 7, cy - 6, cx + 7, cy + 6, (0.8, 0.82, 0.86, 0.9))  # a light rim: a black top hat still shows
+                self._rect(cx - 6, cy - 5, cx + 6, cy + 5, (rgba[0], rgba[1], rgba[2], 1.0))
+            blf.color(FONT, 0.92, 0.92, 0.92, 1.0)
+            blf.position(FONT, x + 22, y, 0)
+            blf.draw(FONT, text)
+            y -= LINE_H
+
+    @staticmethod
+    def _circle(cx, cy, r, color, filled: bool = True):
+        pts = [(cx + r * math.cos(2 * math.pi * i / 20), cy + r * math.sin(2 * math.pi * i / 20)) for i in range(20)]
+        shader = gpu.shader.from_builtin("UNIFORM_COLOR")
+        batch = batch_for_shader(shader, "TRI_FAN" if filled else "LINE_LOOP", {"pos": pts})
+        gpu.state.blend_set("ALPHA")
+        shader.bind()
+        shader.uniform_float("color", color)
+        batch.draw(shader)
+        gpu.state.blend_set("NONE")
 
     @staticmethod
     def _line(a, b, color):

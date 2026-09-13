@@ -5,6 +5,7 @@ import time
 from collections import deque
 from dataclasses import dataclass, field
 
+from .ledger import UsageLedger
 from .theme import tool_category
 
 STATES = ("generating", "tool_running", "awaiting_user", "awaiting_permission", "idle", "ended", "error")
@@ -135,6 +136,7 @@ class Session(Agent):
     ended_at: float = 0.0
     transcript_path: str = ""
     permission_mode: str = ""         # default | acceptEdits | plan | bypassPermissions | ...
+    headless: bool = False            # claude -p / Agent SDK run: done when its turn ends, never "waiting"
     queued: int = 0                   # prompts you typed that are waiting for the agent
     lines_added: int = 0
     lines_removed: int = 0
@@ -187,6 +189,10 @@ class Fleet:
         self.samples: deque = deque(maxlen=4000)
         # per-minute history for the scoreboard sparkline: (minute_epoch, tokens_out, tool_calls)
         self.history: deque = deque(maxlen=60)
+        # priced usage by minute, fed live and by the startup backfill; outlives the sessions
+        self.ledger = UsageLedger()
+        # reply keys already counted into agent tokens (a reply is often several transcript lines)
+        self._usage_keys: set[str] = set()
 
     # ------------------------------------------------------------------ queries
     def live_sessions(self) -> list[Session]:
@@ -261,6 +267,8 @@ class Fleet:
             s.set_title(ev["title"], ev.get("title_source", "custom"))
         if ev.get("permission_mode"):
             s.permission_mode = ev["permission_mode"]
+        if ev.get("headless"):
+            s.headless = True
         s.last_event_at = max(s.last_event_at, at)
 
     def _on_SessionTitle(self, ev, sid, at):
@@ -305,6 +313,8 @@ class Fleet:
             a.thinking = False
             self.cues.append(Cue("done", sid, ""))
             self.cues.append(Cue("report_up", sid, "", a.last_text))
+            if a.headless:
+                self._on_SessionEnded(ev, sid, at)  # nobody is going to answer: fade out and leave
         if a.state != "awaiting_user":
             a.question = "" if a.state in ("generating", "tool_running") else a.question
 
@@ -318,6 +328,22 @@ class Fleet:
         a = self._agent(ev, sid)
         if not a:
             return
+        key = ev.get("key") or ""
+        if key:
+            if key in self._usage_keys:
+                return  # the same reply, written as another transcript line
+            self._usage_keys.add(key)
+        s = self.sessions.get(sid)
+        cw5, cw1 = int(ev.get("cache_write_5m") or 0), int(ev.get("cache_write_1h") or 0)
+        # an adapter that reports a running cost is taken at its word; the rest are priced by model
+        usd = max(0.0, float(ev["cost_usd"]) - a.cost_usd) if ev.get("cost_usd") is not None else None
+        self.ledger.add({
+            "at": at, "session_id": sid, "agent_id": ev.get("agent_id", ""), "cwd": s.cwd if s else "",
+            "model": ev.get("model") or a.model or (s.model if s else ""), "key": key,
+            "tokens_in": max(0, int(ev.get("tokens_in") or 0) - cw5 - cw1), "cache_write_5m": cw5, "cache_write_1h": cw1,
+            "cache_read": int(ev.get("cache_read") or 0), "tokens_out": int(ev.get("tokens_out") or 0),
+            "speed": ev.get("speed") or "", "usd": usd,
+        })
         a.tokens_in += int(ev.get("tokens_in") or 0)
         a.tokens_out += int(ev.get("tokens_out") or 0)
         if ev.get("context_used") is not None:
@@ -332,6 +358,13 @@ class Fleet:
             self.samples.append((at, out))
             self._bucket(at, tokens=out)
         a.last_event_at = max(a.last_event_at, at)
+
+    def _on_UsageBatch(self, ev, sid, at):
+        for row in ev.get("rows") or []:
+            self.ledger.add(row)
+
+    def _on_BackfillDone(self, ev, sid, at):
+        self.ledger.ready = True
 
     def _on_CostState(self, ev, sid, at):
         s = self.sessions.get(sid)

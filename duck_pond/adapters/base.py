@@ -60,6 +60,10 @@ class Adapter:
     def poll(self, now: float) -> list[dict]:  # pragma: no cover - interface
         return []
 
+    def backfill(self, now: float) -> list[dict]:
+        """Past usage for the ledger (UsageBatch events), read once at startup. Creates no ducks."""
+        return []
+
     def describe(self) -> str:
         return self.name
 

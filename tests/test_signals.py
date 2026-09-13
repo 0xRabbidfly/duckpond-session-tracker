@@ -175,6 +175,39 @@ def test_adapter_new_signals():
     assert f.sessions["s1"].cost_usd == 4.2
 
 
+def test_headless_run_leaves_when_done():
+    f = Fleet()
+    f.apply({"type": "SessionSeen", "session_id": "h1", "harness": "claude_code", "cwd": "C:/WINDOWS/system32",
+             "headless": True, "at": T})
+    f.apply({"type": "StateChanged", "session_id": "h1", "state": "generating", "at": T + 1})
+    f.apply({"type": "StateChanged", "session_id": "h1", "state": "awaiting_user", "at": T + 30})
+    s = f.sessions["h1"]
+    assert s.state == "ended" and s.ended_at == T + 30, f"a finished headless run ends ({s.state})"
+    assert _cues(f, "report_up"), "its report still goes up"
+    assert f.totals(T + 31)["waiting"] == 0, "a headless run never waits for you"
+    f.housekeeping(T + 30 + 61, idle_after=180, end_after=1800, remove_after=60)
+    assert "h1" not in f.sessions, "and it leaves the pool after the fade"
+    g = _fleet()
+    g.apply({"type": "StateChanged", "session_id": "s1", "state": "awaiting_user", "at": T + 30})
+    assert g.sessions["s1"].state == "awaiting_user", "an interactive session keeps waiting for you"
+
+
+def test_adapter_marks_headless_runs():
+    import json
+    import tempfile
+
+    from duck_pond.adapters.claude_code import ClaudeCodeAdapter
+    with tempfile.TemporaryDirectory() as d:
+        proj = os.path.join(d, "C--WINDOWS-system32")
+        os.makedirs(proj)
+        for sid, entry in (("h1", "sdk-cli"), ("i1", "cli")):
+            with open(os.path.join(proj, sid + ".jsonl"), "w", encoding="utf-8") as fh:
+                fh.write(json.dumps({"type": "user", "cwd": "C:\\WINDOWS\\system32", "entrypoint": entry,
+                                     "timestamp": "2026-09-13T12:00:00Z", "message": {"content": "go"}}) + "\n")
+        seen = {e["session_id"]: e for e in ClaudeCodeAdapter(d, replay_all=True).poll(T) if e["type"] == "SessionSeen"}
+        assert seen["h1"]["headless"] and not seen["i1"]["headless"]
+
+
 def test_nested_and_background_subagents():
     f = _fleet()
     s = f.sessions["s1"]

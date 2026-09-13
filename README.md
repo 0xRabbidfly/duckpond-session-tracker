@@ -13,7 +13,8 @@ A swimming pool in Blender. Every rubber duck is a Claude Code session; duckling
 are its sub-agents. Lane = working directory, hat = model, body colour = harness. Every duck
 wears a **traffic light**: a lamp on a pole and a halo on the water in its state colour.
 Teal = working, yellow = waiting for you (breathing; goes quiet after 10 minutes), red
-flashing = blocked on a permission, dim grey = idle. Your prompts fall from the sky as amber orbs;
+flashing = blocked on a permission, no light and a greyed-out duck = idle. A key in the corner
+(`H`) spells out halo, body colour and hat. Your prompts fall from the sky as amber orbs;
 finished reports rise as gold ones. Every tool call pops a coloured **chip** naming it in a
 word (`bash`, `edit`, `read`, `web`, `test`, `spawn`). Context compaction is a geyser. Errors
 bring rain. The sun follows your clock; after dark the lido lights come on and the ducks glow.
@@ -74,7 +75,10 @@ clock override to preview the night lido.
 | Key (viewport) | Action |
 |---|---|
 | hover | card for the duck / duckling / tether under the mouse |
-| click | pin the card (full details in the sidebar) |
+| click | pin the card to that duck / duckling: it tracks it until you click elsewhere (full details in the sidebar) |
+| click a scoreboard tab | switch the board's range: `min` `hour` `day` `week` `month` |
+| `T` | cycle the board's range |
+| `H` | show / hide the on-screen key (halo = state, body colour = tool, hat = model) |
 | `K` | name + status tags on **every** duck (kiosk) |
 | `C` | director: auto camera that frames blocked ducks, questions, spawns, reports |
 | `F` | follow the pinned duck |
@@ -95,11 +99,12 @@ clock override to preview the night lido.
 | `tests pass` / `tests FAIL` chip + green/red ring | a test run finished |
 | amber orb falling onto the duck, splash | you sent a prompt |
 | gold orb rising, gold ring, little hop | the turn finished; the report is up |
-| steady teal lamp and halo | working (generating or running a tool) |
+| steady teal lamp and halo | working (generating or running a tool; the chip names the tool) |
 | yellow lamp and halo, breathing | waiting for you (`asking you` chip = a question; the card quotes it) |
 | yellow lamp and halo, dim and still | waiting for more than 10 minutes: quiet, not urgent |
 | red lamp and halo, flashing; impatient rocking | blocked on a permission prompt (inferred from a tool unanswered > 12 s outside bypass mode) |
-| dim grey halo | idle |
+| no lamp, no halo, duck greyed out and see-through | idle |
+| gold ring, then the duck fades out within a minute | a headless run (`claude -p` / Agent SDK) finished; it never waits for you |
 | `denied` chip, red ring, head-shake | you rejected its tool call |
 | amber letters stacked on the tail | prompts you typed that are queued behind this turn |
 | duck sitting low, life ring at 95 % | context window filling up |
@@ -113,9 +118,19 @@ clock override to preview the night lido.
 | dark water, lido lamps, glowing ducks | it is after 20:30 on your clock |
 
 Numbers live on the deck, on purpose. The scoreboard shows `N WORKING · N WAITING · N
-BLOCKED · N IDLE`, spend, tok/min, lines added/removed, sub-agents, the clock, and a
-30-minute bar chart of output tokens per minute. Each lane sign shows the folder, its
-branches, session count, spend, one state-coloured dot per session and a coin per dollar.
+BLOCKED · N IDLE`, then five range tabs (`min` `hour` `day` `week` `month`; click one or press
+`T`). Under them: spend, output tokens and sessions for the picked range (`last 24 h`), the
+same for the month so far (always), and a bar chart of spend per minute / hour / day / week /
+month with its peak. Each lane has one sign on the west deck: the folder name on top, then
+branches · sessions · the folder's spend this month, then one state-coloured dot per session;
+a coin stack (one coin per dollar) stands beside it at the pool edge.
+
+Spend is an **estimate**: every reply's tokens (input, 5-minute and 1-hour cache writes,
+cache reads, output) × that model's API list price, marked `≈$`. It is what the usage would
+cost at API rates, not a bill; `+?` means tokens from a model with no list price. It comes from
+a usage ledger that reads every transcript still on disk at startup (about a second for a month)
+and follows live replies after that, so it does not drop when ducks leave or when you restart.
+Claude Code deletes transcripts after about 30 days, so week and month bars reach back no further.
 
 Glance / hover / click: the duck and its beacon are the glance; the card (state-coloured
 bar, context meter, the question or denial in colour, what it is doing now, what you said,
@@ -128,7 +143,8 @@ is the click. Packet text rides a tether only for the hovered or pinned session.
 ## Data and privacy
 
 The Claude Code adapter tails `~/.claude/projects` on a worker thread and **never writes
-there**. Nothing leaves the machine. Beyond sessions, sub-agents, tool calls, prompts,
+there**. Nothing leaves the machine. At startup it also reads the token usage of every
+transcript still on disk, for the scoreboard's spend; nothing about it is stored. Beyond sessions, sub-agents, tool calls, prompts,
 responses, usage and cost it reads: thinking blocks, `AskUserQuestion` (exact "asking you"),
 tool denials (`toolDenialKind`), queued prompts (`queue-operation`), compaction boundaries,
 turn durations, `cost-state` (lines added/removed, per-model usage), permission mode, effort,
@@ -173,6 +189,8 @@ the add-on, tests or fixtures change.
 ```
 duck_pond/
   model.py           fleet state + event reducer (signals, cues with timestamps)
+  ledger.py          priced usage by minute: ranges, month to date, per session / folder spend
+  pricing.py         API list prices ($/MTok) for the ≈$ estimate
   theme.py           harness colours, model → hat, state colours, tool categories, redaction
   adapters/          claude_code.py (tail follower), stub.py (fixture replay), base.py
   scene/             pool, duck (beacon, mail, glow), tether, ripples, fx (chips, orbs, geyser, rain),

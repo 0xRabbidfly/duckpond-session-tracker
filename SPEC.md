@@ -202,7 +202,9 @@ and count how many sessions are actually working.
 - Hovering a tether shows the last 5 packets with direction arrows and timestamps.
 
 ### 7.2 Click to pin, sidebar panel (secondary)
-- Left-click pins the card so it stays while you move the mouse. Click again to unpin.
+- Left-click a duck, duckling or tether pins its card and name tag to it: they track it as it
+  swims, whatever the mouse hovers next, until a click lands anywhere else in the pool (water,
+  deck, sky). Clicking another duck moves the pin. Clicks on the sidebar never unpin.
 - An N-panel tab **Duck Pond** shows the pinned session in full: complete message
   list (latest 50, expandable), all sub-agents, per-model token/cost table, and buttons:
   *Follow with camera*, *Open transcript file*, *Copy session id*.
@@ -211,6 +213,8 @@ and count how many sessions are actually working.
 ### 7.3 Keyboard
 - `Space` pause/resume live updates (scene keeps animating, data freezes).
 - `F` follow pinned duck. `Home` overview camera. `L` cycle lanes.
+- `T` cycle the scoreboard range (`min` `hour` `day` `week` `month`); clicking a tab on the board
+  does the same (§16).
 - `R` toggle redaction (see §11).
 
 ## 8. Data sources
@@ -420,11 +424,11 @@ You are the sky; tools are under the water; peers are on the surface.
 - **Clock**: the sun follows the PC clock; after 20:30 the lido lights come on, the water
   darkens, and the ducks glow (an emission attribute), so night shifts stay readable.
 - **Weather**: water chop follows fleet output tokens/sec; rain falls when errors pile up.
-- **Scoreboard** on the far deck: `N WORKING · N WAITING · N BLOCKED · N IDLE`, spend,
-  tok/min, lines added/removed, sub-agents, the clock, and a 30-minute bar chart of output
-  tokens per minute as real geometry.
-- **Lane signs**: folder (kept), plus branch line, session count, spend, one state-coloured
-  dot per session, and a **coin stack** (one coin per dollar) on the deck.
+- **Scoreboard** on the far deck: `N WORKING · N WAITING · N BLOCKED · N IDLE`, range tabs,
+  spend for the picked range and for the month so far, and ≈$ bars as real geometry (§16
+  replaced v0.2's live-session spend and 30-minute token sparkline).
+- **Lane signs**: folder (kept), plus branch line, session count, the folder's ≈$ this month
+  (§16), one state-coloured dot per session, and a **coin stack** (one coin per dollar) on the deck.
 
 ### 15.5 Sub-agents
 - Nested agents (spawnDepth 2) orbit their parent *duckling*, not the session duck.
@@ -462,3 +466,69 @@ GUI overlay.
   for the one thing that matters most, which is counting who is paddling. Kept the pool.
 - Cost as duck size: funny, but it hides the model hat and makes lanes unreadable. Coins.
 - Text on every packet: a wall of text at three ducklings. Hover-level now.
+
+## 16. Usage ledger and range picker (built 2026-09-13)
+
+Design: `docs/superpowers/specs/2026-09-13-usage-ledger-design.md`.
+
+### 16.1 Why
+v0.2's `$ spent` summed the sessions still in the pool, so spend fell when ducks left and a
+restart forgot it. The logs make a better answer possible and a naive one wrong:
+- `cost-state` lines are rare and carry no timestamp, so they cannot be bucketed by time.
+- Every assistant line carries `message.usage` with a timestamp, including the cache write
+  split (`ephemeral_5m_input_tokens` / `ephemeral_1h_input_tokens`) and `speed`.
+- One API reply is often written as several lines repeating its usage; `message.id` +
+  `requestId` identify it. Counting lines inflated tokens (9,091 repeats in a month here).
+
+### 16.2 The ledger
+- `duck_pond/pricing.py`: API list $/MTok per model family (longest id prefix wins); cache
+  writes 1.25× input (5 min) and 2× (1 h); cache reads per model (Fable 5.1 $0.25); fast mode
+  doubles input and output. Unknown models count in tokens and show as `+?`, never guessed.
+- `duck_pond/ledger.py`: rows priced into UTC minute buckets (≈$, unpriced tokens, output
+  tokens, session ids), per-session and per-folder ≈$. Ranges are cut on local calendar
+  boundaries at query time. A repeated reply key is ignored.
+- Fed twice: the adapter's `backfill()` reads every transcript on disk once at startup on the
+  worker thread (a month, ~480 MB, in about a second; `UsageBatch` events, no ducks), then live
+  `Usage` events. `BackfillDone` flips the board from `scanning logs…` to figures. The fleet
+  de-duplicates live usage with its own key set, so session token counts stay right. Events that
+  report a running `cost_usd` (the demo fixture, other tools) contribute its increase instead of
+  a price lookup.
+- Nothing is stored: Claude Code's ~30-day log cleanup bounds week and month history.
+
+### 16.3 The board
+
+| tab | bars | "this range" line |
+|---|---|---|
+| `min` | 60 × minute | last 60 min |
+| `hour` (default) | 24 × hour | last 24 h |
+| `day` | 30 × local day | last 30 days |
+| `week` | 8 × Mon–Sun | last 8 weeks |
+| `month` | 6 × calendar month | last 6 months |
+
+Rows: states; tabs (click a plate, or `T`, or the sidebar); `last 24 h  ≈$ · out tok ·
+sessions`; `September  ≈$ · out tok · sessions` (always month to date); footer with the bar
+peak, the clock and, on week/month, `logs keep ~30 days`; ≈$ bars, the current bucket gold.
+Lane signs show the folder's month-to-date ≈$; the hover card shows the session's ≈$
+(sub-agents included) beside any recorded `cost-state` total; the card footer shows ≈$ today.
+
+### 16.4 Readability pass (2026-09-13)
+- **Headless runs**: `entrypoint: sdk-cli` marks a `claude -p` / Agent SDK session
+  (`Session.headless`). Its `end_turn` sends the report up and ends the session at once (fade,
+  then removal), so a scheduled pipeline never piles up yellow "waiting" ducks.
+- **States**: working = teal for both generating and tool running; waiting = `#FFC400`; idle =
+  no lamp, no halo, body colour mostly drained and alpha 0.55. Halo emission 2.2 → 0.7: under
+  Blender's default AgX view the brighter glow rendered yellow as cream.
+- **Key**: a screen-space legend (top right, `H`): halo = state, body colour = tool
+  (`HARNESS_LABELS`), hat = model (`theme.HAT_LEGEND`).
+- **Names**: duck names 0.2 m (ducklings 0.13 m), cut at 24 characters, on a dark badge sized to
+  the text (`pool.add_badge` / `fit_badge`, fitted from the data timer because it evaluates the
+  depsgraph); branch flags too. Session ducks scale 1.35 (was 1.6).
+- **Lane signs**: `deck.LaneSigns` owns the whole sign: a screen-aligned root with a plate,
+  folder name, branch · sessions · ≈$ line and state dots as children; the coin stack stands
+  beside it. `pool.Lanes` only lays out lanes and ropes.
+
+### 16.5 Tests
+`tests/test_ledger.py` (pricing, de-duplication, local boundaries across midnight, Monday and
+the 1st, per-session / per-folder spend, synthetic backfill, live event fields);
+`tests/test_core.py::test_backfill_real_logs`; `tests/headless_smoke.py` (tabs, both lines, bar
+counts per range, underline, month coin stack).

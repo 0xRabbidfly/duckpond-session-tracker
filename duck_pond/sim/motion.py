@@ -36,10 +36,12 @@ SEPARATION_R = 1.6      # ducks closer than this steer apart (names stop overlap
 SEPARATION_SPEED = 0.14  # a waiting duck drifts apart at most this fast
 
 # One colour per state, on the beacon lamp AND the halo on the water. Working is teal, waiting
-# is yellow, blocked is red, idle is grey. No glyphs: a glyph reads the same in every state.
+# is yellow, blocked is red; idle has no light at all and the duck itself greys out and fades.
+# No glyphs: a glyph reads the same in every state.
 STATE_RGBA = {k: hex_to_rgba(v) for k, v in STATE_COLORS.items()}
 WORKING = ("generating", "tool_running")
 QUIET_AFTER_S = 600.0  # a duck waiting this long stops asking for attention (dims, no pulse)
+IDLE_ALPHA = 0.55  # an idle duck is see-through (the runtime also drains its colour)
 
 
 @dataclass
@@ -350,14 +352,14 @@ class Motion:
             roll += math.radians(14) * math.sin(3 * math.pi * k) * (1.0 - k)  # a head-shake "no"
         st.roll = roll
 
-        alpha = 1.0
+        alpha = IDLE_ALPHA if state == "idle" else 1.0
         if state == "ended":
             alpha = max(0.0, 1.0 - (now - s.ended_at) / FADE_S)
         d.place(st.x, st.y, st.z, st.heading, st.pitch, st.roll)
         d.set_alpha(alpha)
         d.set_lifering(frac >= 0.95)
         d.set_flag(s.branch or "")
-        d.set_label(redact(s.display_name, self.redact, 40))
+        d.set_label(redact(s.display_name, self.redact, 24))  # the full name is on the hover card
         self._beacon(d, s, now, st, ripples, alpha)
         d.set_mail(s.queued)
         d.set_glow(self._glow((s.id, ""), state))
@@ -373,7 +375,7 @@ class Motion:
     def _beacon(self, d, agent, now: float, st: MState | None = None, ripples=None, alpha: float = 1.0) -> None:
         """Traffic light per duck: lamp on the pole + halo on the water, both in the state colour.
         working = steady teal · waiting = breathing yellow (quiet after 10 min) · blocked = flashing red
-        · idle = dim grey · error = a red flash over whatever it was."""
+        · idle = no light at all (the duck greys out) · error = a red flash over whatever it was."""
         state = agent.state
         col = STATE_RGBA.get(state, STATE_RGBA["idle"])
         if state in WORKING:
@@ -391,8 +393,9 @@ class Motion:
             pulse = 0.5 + 0.5 * math.sin(2 * math.pi * 2.2 * now)
             halo_a = 0.6 + 0.4 * pulse
         elif state == "idle":
-            pulse = 0.3
-            halo_a = 0.25
+            d.set_beacon(None)
+            d.set_halo((col[0], col[1], col[2], 0.0))
+            return
         else:  # ended
             d.set_beacon(None)
             d.set_halo((col[0], col[1], col[2], 0.15 * alpha))

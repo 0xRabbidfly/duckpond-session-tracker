@@ -48,10 +48,12 @@ class VIEW3D_PT_duck_pond(bpy.types.Panel):
         row.prop(props, "tags_for_all", toggle=True, icon="FONTPREVIEW")
         row.prop(props, "director", toggle=True, icon="CAMERA_DATA")
         row.prop(props, "sound", toggle=True, icon="SPEAKER")
+        row.prop(props, "legend", toggle=True, icon="HELP")
         row = box.row(align=True)
         row.operator("duck_pond.camera_overview", text="Overview", icon="VIEW_CAMERA")
         row.operator("duck_pond.camera_lane", text="Next lane", icon="TRACKING_FORWARDS")
         row.operator("duck_pond.follow", text="Unfollow" if RT.motion.follow else "Follow", icon="OUTLINER_OB_CAMERA")
+        box.prop(props, "board_range", expand=True)
         box.prop(props, "clock_override")
 
         layout.separator()
@@ -110,4 +112,4 @@ class VIEW3D_PT_duck_pond(bpy.types.Panel):
         else:
             layout.label(text="Hover a duck for its card; click to pin it here.")
         layout.label(text="Keys: R redact · F follow · Home overview · L lanes · P pause")
-        layout.label(text="      K tags on all · C director camera · S sound")
+        layout.label(text="      K tags on all · C director camera · S sound · T board range · H legend")

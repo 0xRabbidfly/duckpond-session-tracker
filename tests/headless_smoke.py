@@ -69,6 +69,13 @@ check(len(RT.lanes.keys) == 3, f"3 lanes for 3 working directories (got {RT.lane
 check(obj("DP_LaneRope_1") is not None and obj("DP_LaneSign_0") is not None, "lane ropes and signs exist")
 check(obj("DP_Duck_cc-fable-1_flag").data.body == "master", "tail flag shows the branch")
 check(obj("DP_Duck_cc-fable-1_label").data.body == "duck pond spec", "name label shows the session title")
+_badge = obj("DP_Duck_cc-fable-1_label_badge")
+check(_badge is not None and not _badge.hide_viewport and _badge.scale.x > 0.5 and _badge.scale.y > 0.1 and _badge.location.z < 0,
+      f"name sits on a dark badge sized to it ({tuple(round(v, 2) for v in _badge.scale) if _badge else None})")
+_ln, _ls = obj("DP_LaneName_0"), obj("DP_LaneSub_0")
+check(_ln is not None and _ln.data.body and _ls is not None and "session" in _ls.data.body and _ln.parent == obj("DP_LaneSign_0")
+      and _ls.parent == obj("DP_LaneSign_0") and obj("DP_LanePlate_0").parent == obj("DP_LaneSign_0"),
+      f"lane sign: name over details on one plate ({_ln.data.body if _ln else None} / {_ls.data.body if _ls else None})")
 _h = obj("DP_Duck_cc-opus-2_halo").color
 check(_h[3] > 0.5 and _h[0] > 0.8 and _h[2] < 0.2, f"waiting duck has a yellow halo {tuple(round(c, 2) for c in _h)}")
 _h = obj("DP_Duck_cc-fable-1_halo").color
@@ -87,12 +94,28 @@ check(not obj("DP_Duck_cc-opus-2_beacon").hide_viewport and obj("DP_Duck_cc-opus
       "waiting duck's lamp is yellow")
 check(RT.fleet.sessions["cc-fable-1"].effort == "max", "effort is read from the fixture")
 check(obj("DP_Board") is not None and "WORKING" in obj("DP_Board_L1").data.body, f"scoreboard reads: {obj('DP_Board_L1').data.body}")
-check(len(RT.board.bars) == 30 and any(b.scale.z > 0.05 for b in RT.board.bars), "scoreboard sparkline has a live bar")
+check(RT.fleet.ledger.ready, "the ledger backfill finished")
+check(all(obj(f"DP_Board_Tab_{r}") is not None for r in ("min", "hour", "day", "week", "month")), "scoreboard has the five range tabs")
+check(sum(1 for b in RT.board.bars if not b.hide_viewport) == 24 and any(b.scale.z > 0.05 for b in RT.board.bars),
+      "hour range: 24 bars with a live one")
+check(obj("DP_Board_L2").data.body.startswith("last 24 h") and "≈$" in obj("DP_Board_L2").data.body, f"range line: {obj('DP_Board_L2').data.body}")
+check("≈$" in obj("DP_Board_L3").data.body, f"month line: {obj('DP_Board_L3').data.body}")
+RT.set_board_range("min")
+RT.board.update(RT.fleet, t0 + _t, RT.board_range)
+check(sum(1 for b in RT.board.bars if not b.hide_viewport) == 60 and obj("DP_Board_L2").data.body.startswith("last 60 min"),
+      f"min range: 60 bars ({obj('DP_Board_L2').data.body})")
+check(obj("DP_Board_TabLine_min") is not None and not obj("DP_Board_TabLine_min").hide_viewport and obj("DP_Board_TabLine_hour").hide_viewport,
+      "the selected tab is underlined")
+RT.set_board_range("hour")
 check(any(not o.hide_viewport for o in RT.fx.chips), "a tool chip is on screen (bash / edit / read…)")
 check(RT.fx.active_orbs or any(not o.hide_viewport for o in RT.fx.orbs), "thought bubbles / drops / risers are pooled and visible")
 check(len(RT.signs.objects) == 3, f"every lane has a sign plate ({len(RT.signs.objects)})")
-_portal = [d for k, d in RT.signs.objects.items() if "AI-HUB-Portal" in k]
-check(bool(_portal) and sum(1 for o in _portal[0]["coins"] if not o.hide_viewport) >= 7, "AI-HUB-Portal lane shows its spend as a coin stack")
+RT.signs.last_update = 0.0
+RT.signs.update(RT.lanes, RT.fleet, t0 + _t, RT.redact)
+_portal = [(k, d) for k, d in RT.signs.objects.items() if "AI-HUB-Portal" in k]
+_usd = RT.fleet.ledger.cwd_month_usd(_portal[0][0], t0 + _t) if _portal else 0.0
+check(bool(_portal) and _usd > 0 and sum(1 for o in _portal[0][1]["coins"] if not o.hide_viewport) == min(24, int(_usd)),
+      f"AI-HUB-Portal lane shows its month spend as a coin stack (≈${_usd:.2f})")
 check(RT.sky.chop >= 0.0 and RT.sky.night < 0.5 or RT.sky.clock_override is None, "sky is in a valid day state")
 
 # lane re-layout must not make ducks shake: headings may flip at most a couple of times
@@ -196,6 +219,16 @@ check(vs is not None and vs.state == "ended", "vscode session ended")
 check(obj("DP_Duck_vscode-4").color[3] < 1.0, "ended duck is fading")
 simulate_until(75.0)
 check("vscode-4" not in RT.fleet.sessions and obj("DP_Duck_vscode-4") is None, "ended duck removed after fade")
+
+# idle reads at a glance: no lamp, no halo, the body drained of colour and see-through
+_idle_at = t0 + _t
+RT.fleet.sessions["cc-opus-2"].set_state("idle", _idle_at)
+RT.tick(_idle_at)
+RT.frame(_idle_at, dt=0.1)
+_od = obj("DP_Duck_cc-opus-2")
+_rgb = _od.color[:3]
+check(obj("DP_Duck_cc-opus-2_halo").color[3] == 0.0 and obj("DP_Duck_cc-opus-2_beacon").hide_viewport, "idle duck has no halo and no lamp")
+check(max(_rgb) - min(_rgb) < 0.2 and _od.color[3] < 0.6, f"idle duck is greyed out and see-through ({tuple(round(c, 2) for c in _od.color)})")
 
 bpy.ops.wm.save_as_mainfile(filepath=os.path.join(OUT, "smoke.blend"))
 print(f"\n{'ALL PASS' if not failures else str(len(failures)) + ' FAILURES'} — objects in scene: {len(bpy.data.objects)}")
