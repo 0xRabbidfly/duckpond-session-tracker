@@ -59,6 +59,9 @@ jobs:
       - name: Director and world continuity
         run: ~/blender/blender -b --python tests/headless_director.py
 
+      - name: Watchdog
+        run: ~/blender/blender -b --python tests/headless_watchdog.py
+
       - name: Visual smoke test
         run: ~/blender/blender -b --python tests/headless_smoke.py
 

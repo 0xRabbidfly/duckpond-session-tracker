@@ -10,6 +10,7 @@
 """
 import os
 import sys
+import time
 
 import bpy
 
@@ -22,6 +23,15 @@ import duck_pond  # noqa: E402
 duck_pond.register()
 
 args = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else []
+# Line-buffered, and say so straight away: DuckPond.exe runs Blender detached with its
+# output going to last-run.log, which otherwise stays empty until the run ends -- exactly
+# when it is no longer the run you wanted to read about.
+for _stream in (sys.stdout, sys.stderr):
+    try:
+        _stream.reconfigure(line_buffering=True)
+    except (AttributeError, ValueError):  # pragma: no cover - not a real stream
+        pass
+print(f"[duck_pond] launch {time.strftime('%Y-%m-%d %H:%M:%S')} args={args}")
 props = bpy.context.window_manager.duck_pond
 props.use_stub = "--stub" in args or "--both" in args
 props.use_claude = "--stub" not in args

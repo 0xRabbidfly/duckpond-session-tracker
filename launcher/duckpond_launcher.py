@@ -130,8 +130,12 @@ def main() -> int:
     flags = 0
     if hasattr(subprocess, "DETACHED_PROCESS"):
         flags = subprocess.DETACHED_PROCESS | getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)
+    # Unbuffered: a detached Blender writing to a file otherwise flushes only when it exits, so
+    # the log of a run that is still going -- the one you actually want to read -- stays empty.
+    env = dict(os.environ, PYTHONUNBUFFERED="1")
     try:
-        subprocess.Popen(cmd, stdout=log, stderr=subprocess.STDOUT, cwd=root, creationflags=flags, close_fds=True)
+        subprocess.Popen(cmd, stdout=log, stderr=subprocess.STDOUT, cwd=root, creationflags=flags,
+                         close_fds=True, env=env)
     except OSError as exc:
         _msg(f"Could not start Blender:\n{blender}\n\n{exc}")
         return 4

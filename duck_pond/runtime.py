@@ -1,4 +1,11 @@
-"""Runtime: timer drains adapters into the fleet; frame handler animates the scene."""
+"""Runtime: timer drains adapters into the fleet; frame handler animates the scene.
+
+Everything that moves (ducks, ripples, packets, sky, camera) is driven by `frame_change_post`,
+which only fires while the viewport is playing back. Playback can stop on its own -- resuming
+from sleep is the usual culprit -- and the pond then freezes on a stale frame while the data
+timer keeps running, so the scoreboard is stuck and no new duck ever shows up. `_watchdog`
+checks the moving parts every few seconds and re-arms whichever one died.
+"""
 from __future__ import annotations
 
 import queue
@@ -27,6 +34,8 @@ POLL_INTERVAL = 0.25
 IDLE_AFTER_S = 180.0
 END_AFTER_S = 1800.0  # 30 min of silence -> the duck leaves
 REMOVE_AFTER_S = 60.0
+WATCHDOG_S = 3.0  # how often to check that playback, the timer, the handler and the worker are alive
+STALL_AFTER_S = 8.0  # no frame for this long while running -> the scene is frozen, re-arm playback
 PACKET_MAX_AGE_S = 10.0
 FX_MAX_AGE_S = 10.0  # effects for events older than this (startup replay) are not shown
 
@@ -58,6 +67,8 @@ class Runtime:
         self.paused = False
         self.last_frame_t = 0.0
         self.last_tick_t = 0.0
+        self.frames = 0  # frame-handler calls; the watchdog watches this for a stall
+        self.revivals = 0  # how often the watchdog had to re-arm something (shown in the sidebar)
         self.pinned: Key | None = None
         self.hover: Key | None = None
         self.hover_kind = ""
@@ -102,17 +113,20 @@ class Runtime:
                 bpy.app.timers.register(_timer, first_interval=0.1, persistent=True)
             if _frame not in bpy.app.handlers.frame_change_post:
                 bpy.app.handlers.frame_change_post.append(_frame)
+            if not bpy.app.timers.is_registered(_watchdog):
+                bpy.app.timers.register(_watchdog, first_interval=WATCHDOG_S, persistent=True)
             bpy.app.timers.register(_gui_bootstrap, first_interval=0.5)
 
     def stop(self) -> None:
         self.running = False
         self.status = "stopped"
         self._stop_worker()
-        try:
-            if bpy.app.timers.is_registered(_timer):
-                bpy.app.timers.unregister(_timer)
-        except ValueError:
-            pass
+        for fn in (_timer, _watchdog):
+            try:
+                if bpy.app.timers.is_registered(fn):
+                    bpy.app.timers.unregister(fn)
+            except ValueError:
+                pass
         if _frame in bpy.app.handlers.frame_change_post:
             bpy.app.handlers.frame_change_post.remove(_frame)
 
@@ -357,6 +371,7 @@ class Runtime:
         if dt is None:
             dt = min(0.1, max(0.0, now - self.last_frame_t))
         self.last_frame_t = now
+        self.frames += 1
         cam = P.get("DP_Camera")
         self.motion.night = self.sky.night
         self.motion.pinned = self.pinned
@@ -467,25 +482,86 @@ def _frame(scene, *args):
         print("[duck_pond] frame error:", RT.last_error)
 
 
-def _gui_bootstrap():
-    """Start playback (drives the water shader + frame handler) and the hover operator."""
-    if bpy.app.background or not RT.running:
-        return None
-    wm = bpy.context.window_manager
-    for window in wm.windows:
+def _viewports():
+    """(window, screen, area, region) for every 3D viewport, or an empty list when there is none."""
+    out = []
+    wm = getattr(bpy.context, "window_manager", None)
+    for window in getattr(wm, "windows", []) or []:
         screen = window.screen
         for area in screen.areas:
             if area.type != "VIEW_3D":
                 continue
             region = next((r for r in area.regions if r.type == "WINDOW"), None)
-            try:
-                with bpy.context.temp_override(window=window, screen=screen, area=area, region=region):
-                    if not screen.is_animation_playing:
-                        bpy.ops.screen.animation_play()
-                    if not RT.hover_started:
-                        bpy.ops.duck_pond.hover("INVOKE_DEFAULT")
-                        RT.hover_started = True
-            except Exception as exc:
-                print("[duck_pond] gui bootstrap:", exc)
-            return None
-    return 1.0
+            out.append((window, screen, area, region))
+    return out
+
+
+def _arm_viewport(play: bool = True, hover: bool = True) -> bool:
+    """Start playback and the hover operator in the first 3D viewport. True once a viewport was found.
+
+    Playback is what calls `frame_change_post`, so it is the heartbeat of every moving thing in
+    the pond. It is started here rather than once at launch because it does not always survive
+    the session (waking from sleep drops it), and a pond that has stopped moving looks identical
+    to a pond with nothing in it.
+    """
+    for window, screen, area, region in _viewports():
+        try:
+            with bpy.context.temp_override(window=window, screen=screen, area=area, region=region):
+                if play and not screen.is_animation_playing:
+                    bpy.ops.screen.animation_play()
+                if hover and not RT.hover_started:
+                    bpy.ops.duck_pond.hover("INVOKE_DEFAULT")
+                    RT.hover_started = True
+        except Exception as exc:  # noqa: BLE001 - a viewport mid-teardown is not worth a traceback
+            print("[duck_pond] arm viewport:", exc)
+        return True
+    return False
+
+
+def _gui_bootstrap():
+    """Start playback (drives the water shader + frame handler) and the hover operator."""
+    if bpy.app.background or not RT.running:
+        return None
+    return None if _arm_viewport() else 1.0
+
+
+def _watchdog():
+    """Re-arm whatever stopped: playback, the data timer, the frame handler, the worker thread.
+
+    A frozen pond is indistinguishable from an empty one at a glance, so nothing here waits for
+    a person to notice. Each revival is counted and the reason printed once, which is what turns
+    a silent freeze into a line in the log.
+    """
+    if not RT.running:
+        return None
+    now = time.time()
+    revived = []
+    try:
+        if not bpy.app.timers.is_registered(_timer):
+            bpy.app.timers.register(_timer, first_interval=0.0, persistent=True)
+            revived.append("data timer")
+        if _frame not in bpy.app.handlers.frame_change_post:
+            bpy.app.handlers.frame_change_post.append(_frame)
+            revived.append("frame handler")
+        if RT.threaded and (RT._worker is None or not RT._worker.is_alive()):
+            RT._start_worker()
+            revived.append("adapter worker")
+        # the pond stops moving when playback stops; last_frame_t is only touched by the handler.
+        # Background Blender has no viewport: _viewports() is empty and this half quietly no-ops.
+        stalled = bool(RT.last_frame_t) and now - RT.last_frame_t > STALL_AFTER_S
+        playing = any(screen.is_animation_playing for _w, screen, _a, _r in _viewports())
+        if (stalled or not playing) and _arm_viewport(play=True, hover=False):
+            if not playing:
+                revived.append("playback")
+        if stalled:
+            for _w, _s, area, _r in _viewports():
+                area.tag_redraw()
+    except Exception:  # noqa: BLE001 - the watchdog must outlive whatever it is watching
+        RT.last_error = traceback.format_exc(limit=3)
+        print("[duck_pond] watchdog error:", RT.last_error)
+        return WATCHDOG_S
+    if revived:
+        RT.revivals += len(revived)
+        note = f" after {now - RT.last_frame_t:.0f}s without a frame" if stalled else ""
+        print(f"[duck_pond] watchdog revived: {', '.join(revived)}{note}")
+    return WATCHDOG_S

@@ -30,6 +30,8 @@ class VIEW3D_PT_duck_pond(bpy.types.Panel):
         layout.label(text=RT.status, icon="INFO")
         if RT.last_error:
             layout.label(text="last error in console", icon="ERROR")
+        if RT.revivals:
+            layout.label(text=f"watchdog revived {RT.revivals}x", icon="RECOVER_LAST")
 
         box = layout.box()
         box.label(text="Sources")
