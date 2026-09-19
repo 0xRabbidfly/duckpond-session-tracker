@@ -23,6 +23,7 @@ from .scene import pool as P
 from .scene.deck import LaneSigns, Scoreboard
 from .scene.duck import DuckObj
 from .scene.fx import FX
+from .scene.props import PoolProps
 from .scene.ripples import Ripples
 from .scene.sky import Sky
 from .scene.tether import PacketSystem, Tether
@@ -57,6 +58,7 @@ class Runtime:
         self.board = Scoreboard()
         self.signs = LaneSigns()
         self.sky = Sky()
+        self.props = PoolProps()
         self.director = Director()
         self.sound = None  # set by the addon when enabled (sound.Sound)
         self.tags_for_all = False  # kiosk: screen-space name tags on every duck
@@ -97,6 +99,7 @@ class Runtime:
         self.packets.ensure_pools()
         self.fx.ensure_pools()
         self.sky.ensure()
+        self.props.ensure()
         self.board.ensure()
         self.packets.redact_enabled = self.redact
         self.running = True
@@ -147,6 +150,7 @@ class Runtime:
         self.board = Scoreboard()
         self.signs = LaneSigns()
         self.sky = Sky()
+        self.props = PoolProps()
         self.director = Director()
         self.fleet = Fleet()
         coll = bpy.data.collections.get(P.COLL_NAME)
@@ -381,6 +385,7 @@ class Runtime:
         self.ripples.update(dt)
         self.fx.update(dt)
         self.sky.update(now, dt)
+        self.props.update(now, dt)  # the pool toys drift whatever else is happening
         self.signs.scale_to_camera(cam)  # every lane sign the same size on screen
         if self.director.enabled and self.motion.follow is None:
             # only what you pinned; the camera never goes hunting on its own

@@ -37,8 +37,10 @@ FONT = 0
 PAD = 12
 LINE_H = 18
 TITLE_SIZE = 20
-TAG_SIZE = 26
-TAG_SIZE_SMALL = 15
+STATUS_SIZE = 31    # the pool status, centred along the top: the biggest text on screen
+TAG_SIZE = 19       # big enough to read across a room, small enough not to own the frame
+TAG_SIZE_SMALL = 12
+TAG_BG = (0.04, 0.05, 0.08, 0.52)  # see-through: a tag sits over water and ducks, not beside them
 BG = (0.04, 0.05, 0.08, 0.86)
 # (state, word, hint) for the on-screen key; idle has no halo, so its swatch is an empty ring
 LEGEND_STATES = (
@@ -202,6 +204,7 @@ class DUCKPOND_OT_hover(bpy.types.Operator):
         self._draw_card(context, region, card, footer, key)
         if RT.show_legend:
             self._draw_legend(context, region)
+        self._draw_status(region, now)  # last: the one thing that must never be covered
         if RT.last_error:
             blf.size(FONT, 13)
             blf.color(FONT, 1.0, 0.4, 0.4, 1.0)
@@ -370,10 +373,10 @@ class DUCKPOND_OT_hover(bpy.types.Operator):
         x = min(max(p.x - bw / 2, 8), region.width - bw - 8)
         y = min(max(p.y, 8 + sh + 6), region.height - h - 8)
         sc = cards.state_rgba(state)
-        self._rect(x - 10, y - sh - 10, x + bw + 10, y + h + 8, (0.04, 0.05, 0.08, 0.9))
-        self._rect(x - 10, y - sh - 10, x + bw + 10, y - sh - 6, (sc[0], sc[1], sc[2], 1.0))
+        self._rect(x - 8, y - sh - 9, x + bw + 8, y + h + 7, TAG_BG)
+        self._rect(x - 8, y - sh - 9, x + bw + 8, y - sh - 6, (sc[0], sc[1], sc[2], 0.95))
         if pinned:
-            self._rect(x - 10, y + h + 5, x + bw + 10, y + h + 8, (1.0, 0.7, 0.3, 0.95))
+            self._rect(x - 8, y + h + 4, x + bw + 8, y + h + 7, (1.0, 0.7, 0.3, 0.95))
         blf.size(FONT, size)
         blf.color(FONT, 1.0, 0.96, 0.88, 1.0)
         blf.position(FONT, x + (bw - w) / 2, y, 0)
@@ -382,6 +385,39 @@ class DUCKPOND_OT_hover(bpy.types.Operator):
         blf.color(FONT, min(1.0, sc[0] * 1.5 + 0.3), min(1.0, sc[1] * 1.5 + 0.3), min(1.0, sc[2] * 1.5 + 0.3), 1.0)
         blf.position(FONT, x + (bw - sw) / 2, y - sh - 4, 0)
         blf.draw(FONT, status)
+        blf.size(FONT, 13)
+
+    def _draw_status(self, region, now: float) -> None:
+        """Who is doing what, top-left, one colour per state.
+
+        This used to be the top row of the 3D scoreboard, where a duck's name tag would park on
+        it and hide it for minutes. Drawn here it is in screen space, centred along the top and
+        last of everything, so it is the one readout in the pool that nothing can cover.
+        """
+        segs = cards.status_segments(RT.fleet, now)
+        blf.size(FONT, STATUS_SIZE)
+        sep = "  ·  "
+        sep_w = blf.dimensions(FONT, sep)[0]
+        widths = [blf.dimensions(FONT, text)[0] for text, _st in segs]
+        total = sum(widths) + sep_w * (len(segs) - 1)
+        h = blf.dimensions(FONT, "M")[1]
+        w = total + 2 * PAD + 16
+        x0 = max(12, (region.width - w) / 2)
+        y1 = region.height - 18
+        y0 = y1 - h - 2 * PAD
+        self._rect(x0, y0, x0 + w, y1, (0.04, 0.05, 0.08, 0.72))
+        x = x0 + PAD + 8
+        for i, ((text, state), sw) in enumerate(zip(segs, widths)):
+            c = cards.state_rgba(state)
+            blf.color(FONT, min(1.0, c[0] * 1.5 + 0.25), min(1.0, c[1] * 1.5 + 0.25), min(1.0, c[2] * 1.5 + 0.25), 1.0)
+            blf.position(FONT, x, y0 + PAD, 0)
+            blf.draw(FONT, text)
+            x += sw
+            if i < len(segs) - 1:
+                blf.color(FONT, 0.5, 0.55, 0.62, 1.0)
+                blf.position(FONT, x, y0 + PAD, 0)
+                blf.draw(FONT, sep)
+                x += sep_w
         blf.size(FONT, 13)
 
     # ------------------------------------------------------------ legend

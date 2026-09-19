@@ -16,8 +16,8 @@ from . import meshes as MS
 from . import pool as P
 
 BOARD_W = 9.0
-BOARD_H = 2.9
-BOARD_Z = 1.65  # centre height; the bottom edge stays just above the deck
+BOARD_H = 2.3   # the live status row moved to the screen overlay; the board lost a row
+BOARD_Z = 1.35  # centre height; the bottom edge stays just above the deck
 SPARK_BARS = 60  # bars built; a range shows the first RANGES[name][0] of them
 BAR_MAX_H = 0.62  # bars stand in front of the text: keep the tallest clear of the footer from a raised camera
 TAB_W = 1.1
@@ -73,14 +73,16 @@ def fmt_stats(st) -> str:
 class Scoreboard:
     """A dark board standing on the north deck, read from across the room.
 
-    Row 1: who is doing what. Row 2: range tabs (click one, or press T). Row 3: estimated spend for
-    the picked range. Row 4: the month so far, whatever the range. Below: ≈$ per bucket for the
-    picked range as real geometry, the current bucket in gold. Spend comes from the usage ledger,
-    so it does not drop when ducks leave the pool."""
+    Row 1: range tabs (click one, or press T). Row 2: estimated spend for the picked range.
+    Row 3: the month so far, whatever the range. Below: ≈$ per bucket for the picked range as
+    real geometry, the current bucket in gold. Spend comes from the usage ledger, so it does not
+    drop when ducks leave the pool.
+
+    Who is doing what is *not* here: it is drawn in screen space at the top-left, because a
+    duck's name tag would park on top of this board and hide it for minutes at a time."""
 
     def __init__(self) -> None:
         self.board: bpy.types.Object | None = None
-        self.line1 = None
         self.line2 = None
         self.line3 = None
         self.line4 = None
@@ -105,11 +107,10 @@ class Scoreboard:
         self.gold = M.flat_material("TextGold", "#F5C542", roughness=0.8, emission=1.4)
         self.dim = M.flat_material("TextDim", "#B8C2D6", roughness=0.8, emission=0.8)
         teal = M.flat_material("TextTeal", "#5EEAD4", roughness=0.8, emission=1.4)
-        self.line1 = _text("DP_Board_L1", "", 0.4, white, "CENTER")
         self.line2 = _text("DP_Board_L2", "", 0.24, self.gold, "CENTER")
         self.line3 = _text("DP_Board_L3", "", 0.24, white, "CENTER")
         self.line4 = _text("DP_Board_L4", "", 0.17, teal, "CENTER")
-        for o, dz in ((self.line1, 0.98), (self.line2, 0.12), (self.line3, -0.18), (self.line4, -0.46)):
+        for o, dz in ((self.line2, 0.34), (self.line3, 0.04), (self.line4, -0.24)):
             o.location = (x0, y - 0.03, z + dz)
             o.rotation_euler = (1.5708, 0.0, 0.0)
             o["dp_kind"] = "deck"
@@ -117,7 +118,7 @@ class Scoreboard:
         plate_mat = M.flat_material("TabPlate", "#1F2738", roughness=0.8)
         for i, name in enumerate(RANGE_ORDER):
             tx = x0 + TAB_GAP * (i - (len(RANGE_ORDER) - 1) / 2)
-            tz = z + 0.55
+            tz = z + 0.78
             plate = P.new_object(f"DP_Board_Tab_{name}", MS.box_mesh("BoardTab", TAB_W, 0.01, 0.36, plate_mat))
             plate.location = (tx, y - 0.015, tz)
             text = _text(f"DP_Board_TabText_{name}", name, 0.22, self.dim, "CENTER")
@@ -172,14 +173,6 @@ class Scoreboard:
             return
         self.last_update = now
         self.ensure()
-        t = fleet.totals(now)
-        parts = [f"{t['active']} WORKING", f"{t['waiting']} WAITING"]
-        if t["blocked"]:
-            parts.append(f"{t['blocked']} BLOCKED")
-        idle = t["ducks"] - t["active"] - t["waiting"]
-        if idle > 0:
-            parts.append(f"{idle} IDLE")
-        _set_body(self.line1, "  ·  ".join(parts) if t["ducks"] else "POOL IS EMPTY")
         led = fleet.ledger
         n, label, unit = RANGES[board_range]
         self._select_tab(board_range)

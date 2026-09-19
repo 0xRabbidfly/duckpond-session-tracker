@@ -240,6 +240,25 @@ def tag_for(fleet: Fleet, key: tuple[str, str], now: float, redact_on: bool) -> 
     return name_for(fleet, key, redact_on), status, a.state
 
 
+def status_segments(fleet: Fleet, now: float) -> list[tuple[str, str]]:
+    """(text, state) for the live pool status, one segment per state so each can be drawn in
+    its own colour. Lives here, not on the board, because it is now drawn in screen space:
+    a duck's name tag used to sit on top of it for minutes at a time."""
+    t = fleet.totals(now)
+    if not t["ducks"]:
+        return [("POOL IS EMPTY", "idle")]
+    # totals() counts a blocked duck under "waiting" as well, so take it out of that bucket:
+    # these segments are read as a breakdown and should add up to the number of ducks.
+    waiting = max(0, t["waiting"] - t["blocked"])
+    idle = t["ducks"] - t["active"] - t["waiting"]
+    out = [(f"{t['active']} WORKING", "generating"), (f"{waiting} WAITING", "awaiting_user")]
+    if t["blocked"]:
+        out.append((f"{t['blocked']} BLOCKED", "awaiting_permission"))
+    if idle > 0:
+        out.append((f"{idle} IDLE", "idle"))
+    return out
+
+
 TOTALS_SCOPE = "WHOLE POOL"  # the footer sits under a card about one duck; say what it counts
 
 
