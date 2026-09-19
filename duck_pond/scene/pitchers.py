@@ -10,6 +10,7 @@ It reads at a glance from across a room, which a percentage on a board does not.
 from __future__ import annotations
 
 import bpy
+from mathutils import Vector
 
 from ..theme import hex_to_rgba
 from . import materials as M
@@ -17,18 +18,23 @@ from . import meshes as MS
 from . import pool as P
 from .deck import _text
 
-TABLE_AT = (15.75, 8.95)   # the north-east deck, clear of the ladder and the start blocks
-TABLE_R = 1.00
+TABLE_AT = (15.15, 9.35)   # the outer corner of the north-east deck, well back from the water
+TABLE_R = 1.15
 TABLE_TOP_Z = 0.92
-JUG_DX = 0.55              # the two jugs either side of the table's centre
-JUG_R, JUG_H = 0.20, 0.58
+JUG_DX = 0.58              # the two jugs either side of the table's centre
+JUG_R, JUG_H = 0.26, 0.72
 WALL = 0.016               # glass thickness, so the sangria sits inside the jug
-LABEL_DY = -0.88           # the label hangs off the front edge of the table, facing the camera
-# The labels are a fixed size, not scaled to the camera like the lane signs: both jugs sit at
-# the same distance, so scaling buys nothing and only made the two plates overlap.
-PLATE_W, PLATE_H = 1.00, 0.62
-SANGRIA = "#B3123C"
-SANGRIA_LOW = "#E0563F"    # barely touched: lighter, like a jug just poured
+# The labels float above the jugs, not under them: below, they sat over the busy end of the
+# pool. They are wider apart than the jugs and overhang the table, because they are signage
+# rather than furniture -- and they are scaled to the camera at the lane signs' own reference
+# distance, so a jug label and a lane sign are exactly the same size on screen.
+LABEL_DX = 1.36
+LABEL_DY = -0.22
+LABEL_Z = 2.20
+LABEL_REF_DIST = 15.2
+PLATE_W, PLATE_H = 1.78, 1.00
+SANGRIA = "#8E0A2C"        # deep: the frosted glass in front lightens whatever is behind it
+SANGRIA_LOW = "#C43A2E"    # barely touched: lighter, like a jug just poured
 FRUIT = "#F0A030"
 
 WINDOWS = (("5 HOURS", "session"), ("THIS WEEK", "week"))
@@ -79,7 +85,7 @@ class Pitchers:
         self.objects = {}
         x, y = TABLE_AT
         glass = M.glass_material()
-        table = P.new_object("DP_SangriaTable", _table_mesh(M.flat_material("TableTop", "#E8E2D6", roughness=0.5)))
+        table = P.new_object("DP_SangriaTable", _table_mesh(M.flat_material("TableTop", "#2B3444", roughness=0.45)))
         table.location = (x, y, 0.0)
         table["dp_kind"] = "deck"
         self.objects["table"] = table
@@ -88,7 +94,7 @@ class Pitchers:
             jug = P.new_object(f"DP_Jug_{key}", _jug_mesh(glass))
             jug.location = (x + dx, y, TABLE_TOP_Z + 0.03)
             fill = P.new_object(f"DP_JugFill_{key}", _fill_mesh(
-                M.object_color_material("Sangria", roughness=0.15, emission=0.12, alpha_from_object=False)))
+                M.object_color_material("Sangria", roughness=0.12, emission=0.0, alpha_from_object=False)))
             fill.location = (x + dx, y, TABLE_TOP_Z + 0.045)
             fill.scale = (1.0, 1.0, 0.001)
             fruit = P.new_object(f"DP_JugFruit_{key}", MS.sphere_mesh(
@@ -96,20 +102,20 @@ class Pitchers:
             fruit.location = (x + dx + 0.04, y, TABLE_TOP_Z + 0.05)
             # one screen-aligned plate under the jug: the window and when it clears
             root = P.new_object(f"DP_JugLabel_{key}")
-            root.location = (x + dx, y + LABEL_DY, TABLE_TOP_Z - 0.06)
+            root.location = (x + LABEL_DX * (i * 2 - 1), y + LABEL_DY, LABEL_Z)
             c = root.constraints.new("COPY_ROTATION")
             c.target = P.camera()
             plate = P.new_object(f"DP_JugPlate_{key}",
                                  MS.plate_mesh("JugPlate", PLATE_W, PLATE_H, M.board_material()))
-            plate.location = (0.0, -PLATE_H / 2, -0.02)  # hangs below the table edge
-            head = _text(f"DP_JugTitle_{key}", title, 0.125, M.text_material(), "CENTER")
-            head.location = (0.0, -0.17, 0.0)
-            pct = _text(f"DP_JugPct_{key}", "", 0.21,
+            plate.location = (0.0, PLATE_H / 2, -0.02)  # stands above the jugs
+            head = _text(f"DP_JugTitle_{key}", title, 0.27, M.text_material(), "CENTER")
+            head.location = (0.0, PLATE_H - 0.33, 0.0)
+            pct = _text(f"DP_JugPct_{key}", "", 0.30,
                         M.flat_material("TextGold", "#F5C542", roughness=0.8, emission=1.4), "CENTER")
-            pct.location = (0.0, -0.40, 0.0)
-            sub = _text(f"DP_JugSub_{key}", "", 0.105,
+            pct.location = (0.0, PLATE_H - 0.66, 0.0)
+            sub = _text(f"DP_JugSub_{key}", "", 0.185,
                         M.flat_material("TextDim", "#B8C2D6", roughness=0.8, emission=0.8), "CENTER")
-            sub.location = (0.0, -0.56, 0.0)
+            sub.location = (0.0, PLATE_H - 0.90, 0.0)
             for o in (plate, head, pct, sub):
                 o.parent = root
             for o in (jug, fill, fruit, root, plate, head, pct, sub):
@@ -144,3 +150,22 @@ class Pitchers:
                 if self.last_text.get(key + slot) != text:
                     self.last_text[key + slot] = text
                     d[slot].data.body = text
+
+    def scale_to_camera(self, cam) -> None:
+        """Keep the jug labels exactly the size of a lane sign, whatever the camera does."""
+        if cam is None:
+            return
+        try:
+            eye = Vector(cam.location)
+        except (AttributeError, ReferenceError):
+            return
+        for _title, key in WINDOWS:
+            d = self.objects.get(key)
+            if not d:
+                continue
+            try:
+                k = max(0.6, min(2.5, (Vector(d["root"].location) - eye).length / LABEL_REF_DIST))
+                if abs(d["root"].scale.x - k) > 1e-4:
+                    d["root"].scale = (k, k, k)
+            except ReferenceError:
+                return

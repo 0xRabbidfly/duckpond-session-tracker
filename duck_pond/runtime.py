@@ -392,6 +392,7 @@ class Runtime:
         self.fx.update(dt)
         self.sky.update(now, dt)
         self.props.update(now, dt)  # the pool toys drift whatever else is happening
+        self.pitchers.scale_to_camera(cam)
         self.signs.scale_to_camera(cam)  # every lane sign the same size on screen
         if self.director.enabled and self.motion.follow is None:
             # only what you pinned; the camera never goes hunting on its own

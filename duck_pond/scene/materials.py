@@ -249,7 +249,9 @@ def tile_material(name: str = "Tile", color1: str = "#6FB7D6", color2: str = "#F
 
 
 def deck_material() -> bpy.types.Material:
-    return flat_material("Deck", "#D8D2C4", roughness=0.9)
+    """Warm clay, not the near-white it was: at #D8D2C4 the deck and the sky background were
+    within a few levels of each other and the pool had no edge to read against."""
+    return flat_material("Deck", "#A6603F", roughness=0.9)
 
 
 def lane_rope_material() -> bpy.types.Material:
