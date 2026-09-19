@@ -2,11 +2,13 @@
 
     blender -b --python tests/headless_smoke.py
 """
+import math
 import os
 import sys
 import time
 
 import bpy
+from mathutils import Vector
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
@@ -87,6 +89,18 @@ check(obj("DP_Duck_cc-opus-2_halo").location.z < 0.05 and abs(obj("DP_Duck_cc-op
 check(RT.motion.states[("cc-fable-1", "")].speed > 0.3, "generating duck paddles")
 _opus = RT.motion.states[("cc-opus-2", "")]
 check(_opus.speed < 0.05 or _opus.relocating, "waiting duck floats still (unless paddling to a re-laid lane)")
+# the context ring is worn over the head and must not cut across the face
+_ring = obj("DP_Duck_cc-opus-2_ring")
+_R, _TUBE, _BILL = 0.224, 0.045, Vector((0.36, 0.0, 0.21))
+_c, _th = Vector(_ring.location), _ring.rotation_euler.y
+_pts = [_c + Vector((_R * math.cos(a) * math.cos(_th), _R * math.sin(a), -_R * math.cos(a) * math.sin(_th)))
+        for a in (2 * math.pi * i / 144 for i in range(144))]
+_near_bill = min((p - _BILL).length for p in _pts)
+check(not _ring.hide_viewport, "the context ring is always worn")
+check(_near_bill > 0.15, f"the ring clears the bill by {_near_bill:.3f} (level at the neck it was 0.04)")
+check(min(p.z for p in _pts) < 0.0 < max(p.z for p in _pts),
+      f"it slopes from above the neck into the water (z {min(p.z for p in _pts):+.3f}..{max(p.z for p in _pts):+.3f})")
+check(_th > 0.3, f"and it is tilted, not level ({math.degrees(_th):.0f} deg)")
 check(len(RT.ripples.active_rings) > 0, "water has active ripple rings")
 check(obj("DP_Duck_cc-opus-2").location.z < -0.08, "opus at 91 % of its 1M context sits low in the water")
 check(obj("DP_Duck_vscode-4").rotation_euler.y > 0.1, "tool-running duck dips its head")
@@ -121,7 +135,6 @@ check(bool(_portal) and _usd > 0 and f"${_usd:.0f}" in _portal[0][1]["sub"].data
 check(RT.sky.chop >= 0.0 and RT.sky.night < 0.5 or RT.sky.clock_override is None, "sky is in a valid day state")
 
 # lane re-layout must not make ducks shake: headings may flip at most a couple of times
-import math
 import math as _m
 
 _hist = {k: [] for k in RT.motion.states if not k[1]}

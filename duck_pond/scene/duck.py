@@ -1,6 +1,8 @@
 """Duck / duckling objects with hats, tail flags, status bubbles and context rings."""
 from __future__ import annotations
 
+import math
+
 import bpy
 from mathutils import Vector
 
@@ -123,10 +125,11 @@ class DuckObj:
         self.lifering = P.new_object(f"{name}_ring", MS.lifering_mesh(
             M.object_color_material("ContextRing", roughness=0.3, emission=0.25, alpha_from_object=False)))
         self.lifering.parent = self.obj
-        # At the neck, just under the head: down at 0.12 the body is wider than the ring, so the
-        # ring was buried in it and only the front edge showed. Up here only the back arc rests
-        # in the duck, which is where a ring worn over the head would sit anyway.
-        self.lifering.location = (0.20, 0.0, 0.225)
+        # Worn the way a person wears one: high at the back of the neck, sloping down over the
+        # chest and dipping into the water at the front. Level at the neck it cut straight
+        # across the bill; this way the nearest point to the bill is 0.23 rather than 0.04.
+        self.lifering.location = (0.125, 0.0, 0.13)
+        self.lifering.rotation_euler = (0.0, math.radians(38.7), 0.0)
         self.lifering["dp_kind"] = "hat"  # hovering the ring hovers the duck
         self.lifering["dp_session_id"] = session_id
         self.lifering["dp_agent_id"] = agent_id

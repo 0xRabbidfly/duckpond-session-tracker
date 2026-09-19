@@ -209,14 +209,14 @@ def sphere_mesh(name: str, r: float, mat) -> bpy.types.Mesh:
 def lifering_mesh(mat) -> bpy.types.Mesh:
     """The ring a duck wears: one material, coloured per duck from its object colour.
 
-    Sized to clear the head (radius 0.14) and sit at the neck. At the old 0.175 it was narrower
+    Sized to clear the head (radius 0.14) and be worn over it. At the old 0.175 it was narrower
     than the body at the height it was worn, so roughly half of it was inside the duck.
     """
     me = _existing("LifeRing")
     if me:
         return me
     b = _Builder()
-    b.torus(0.20, 0.042, slot=0)
+    b.torus(0.224, 0.045, slot=0)
     return b.finish("LifeRing", [mat])
 
 
