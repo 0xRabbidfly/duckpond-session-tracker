@@ -16,7 +16,9 @@ sys.path.insert(0, ROOT)
 import duck_pond  # noqa: E402
 from duck_pond.adapters.stub import StubAdapter  # noqa: E402
 from duck_pond.runtime import RT  # noqa: E402
+from duck_pond.scene.pitchers import JUG_H, WALL  # noqa: E402
 from duck_pond.ui import cards  # noqa: E402
+from duck_pond.usage_limits import Gauge, Usage  # noqa: E402
 
 OUT = os.path.join(ROOT, "out")
 os.makedirs(OUT, exist_ok=True)
@@ -101,6 +103,19 @@ check(_near_bill > 0.15, f"the ring clears the bill by {_near_bill:.3f} (level a
 check(min(p.z for p in _pts) < 0.0 < max(p.z for p in _pts),
       f"it slopes from above the neck into the water (z {min(p.z for p in _pts):+.3f}..{max(p.z for p in _pts):+.3f})")
 check(_th > 0.3, f"and it is tilted, not level ({math.degrees(_th):.0f} deg)")
+# the sangria jugs: filled from the usage limits, which a test must never go and fetch
+check(not RT.limits._thread, "a headless run never starts the usage-limit reader")
+RT.limits.set_snapshot(Usage(session=Gauge(0.25, "8:30pm"), week=Gauge(1.0, "Sep 26, 4pm"), ok=True))
+RT.pitchers.update(RT.limits.snapshot())
+_inner = JUG_H - 2 * WALL
+_fs = obj("DP_JugFill_session").scale.z
+_fw = obj("DP_JugFill_week").scale.z
+check(abs(_fs - _inner * 0.25) < 1e-6 and abs(_fw - _inner) < 1e-6,
+      f"each jug is poured to its window ({_fs:.3f} and {_fw:.3f} of {_inner:.3f})")
+_week_label = obj("DP_JugSub_week").data.body
+check(_week_label == "resets Sep 26, 4pm", f"the reset time is written under the jug ({_week_label!r})")
+RT.pitchers.update(Usage(ok=False, error="no CLI"))
+check(obj("DP_JugSub_session").data.body == "no reading", "a failed read says so rather than showing zero")
 check(len(RT.ripples.active_rings) > 0, "water has active ripple rings")
 check(obj("DP_Duck_cc-opus-2").location.z < -0.08, "opus at 91 % of its 1M context sits low in the water")
 check(obj("DP_Duck_vscode-4").rotation_euler.y > 0.1, "tool-running duck dips its head")

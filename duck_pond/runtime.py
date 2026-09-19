@@ -23,6 +23,7 @@ from .scene import pool as P
 from .scene.deck import LaneSigns
 from .scene.duck import DuckObj
 from .scene.fx import FX
+from .scene.pitchers import Pitchers
 from .scene.props import PoolProps
 from .scene.ripples import Ripples
 from .scene.sky import Sky
@@ -30,6 +31,7 @@ from .scene.tether import PacketSystem, Tether
 from .sim.director import Director
 from .sim.motion import Motion
 from .theme import harness_color
+from .usage_limits import UsageLimits
 
 POLL_INTERVAL = 0.25
 IDLE_AFTER_S = 180.0
@@ -58,7 +60,9 @@ class Runtime:
         self.signs = LaneSigns()
         self.sky = Sky()
         self.props = PoolProps()
+        self.pitchers = Pitchers()
         self.director = Director()
+        self.limits = UsageLimits()  # the sangria jugs: your 5-hour and 7-day windows
         self.sound = None  # set by the addon when enabled (sound.Sound)
         self.tags_for_all = False  # kiosk: screen-space name tags on every duck
         self.view_locked = False  # app mode: viewports copy DP_Camera every frame (see lock_views)
@@ -99,11 +103,14 @@ class Runtime:
         self.fx.ensure_pools()
         self.sky.ensure()
         self.props.ensure()
+        self.pitchers.ensure()
         self.packets.redact_enabled = self.redact
         self.running = True
         self.paused = False
         self.last_frame_t = time.time()
         self.status = "running: " + ", ".join(a.describe() for a in adapters)
+        if not bpy.app.background:
+            self.limits.start()  # never from a headless run: each read is a real CLI call
         gui = (not bpy.app.background) if gui is None else gui
         if gui and self.threaded:
             self._start_worker()  # the worker backfills the ledger before it polls
@@ -122,6 +129,7 @@ class Runtime:
         self.running = False
         self.status = "stopped"
         self._stop_worker()
+        self.limits.stop()
         for fn in (_timer, _watchdog):
             try:
                 if bpy.app.timers.is_registered(fn):
@@ -148,6 +156,7 @@ class Runtime:
         self.signs = LaneSigns()
         self.sky = Sky()
         self.props = PoolProps()
+        self.pitchers = Pitchers()
         self.director = Director()
         self.fleet = Fleet()
         coll = bpy.data.collections.get(P.COLL_NAME)
@@ -283,6 +292,7 @@ class Runtime:
         # the world and the deck
         self.sky.tick(self.fleet, now)
         self.signs.update(self.lanes, self.fleet, now, self.redact)
+        self.pitchers.update(self.limits.snapshot())
 
     def _duck_pos(self, key: Key):
         d = self.ducks.get(key)

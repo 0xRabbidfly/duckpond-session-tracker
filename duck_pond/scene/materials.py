@@ -324,6 +324,24 @@ def halo_material() -> bpy.types.Material:
     return mat
 
 
+def glass_material() -> bpy.types.Material:
+    """A jug you can see the sangria through: transmissive, barely tinted, lightly rough."""
+    mat = _get("Glass")
+    if mat:
+        return mat
+    mat, nt, bsdf = _new("Glass")
+    # Frosted and alpha-blended, with no transmission at all. Optically clear glass rendered
+    # as nothing on a 20 cm jug twenty metres away, and turning transmission up instead filled
+    # the jug with sampling noise at viewport sample counts.
+    _set(bsdf, "Base Color", (0.88, 0.93, 0.97, 1.0))
+    _set(bsdf, "Roughness", 0.18)
+    _set(bsdf, "Transmission Weight", 0.0)
+    _set(bsdf, "Specular IOR Level", 0.7)
+    _set(bsdf, "Alpha", 0.38)
+    _blended(mat)
+    return mat
+
+
 def board_material() -> bpy.types.Material:
     return flat_material("Board", "#0E1320", roughness=0.7)
 

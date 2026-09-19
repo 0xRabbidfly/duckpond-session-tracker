@@ -40,6 +40,11 @@ class VIEW3D_PT_duck_pond(bpy.types.Panel):
         if props.use_stub:
             box.prop(props, "stub_path", text="")
         box.prop(props, "live_window_min")
+        row = box.row(align=True)
+        row.prop(props, "limits", toggle=True)
+        sub = row.row(align=True)
+        sub.enabled = props.limits
+        sub.prop(props, "limits_every_min", text="every")
 
         box = layout.box()
         box.label(text="View")

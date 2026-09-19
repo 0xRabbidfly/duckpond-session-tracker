@@ -9,7 +9,9 @@ RGBA = tuple[float, float, float, float]
 HARNESS_COLORS = {
     "claude_code": "#D97757",
     "codex": "#F5F5F5",
-    "vscode": "#F2C230",  # was VS Code blue, which disappeared into the water
+    # Violet, not VS Code blue (which disappeared into the water) and not the amber it was
+    # before, which sat one step from Claude Code's terracotta and read as the same swatch.
+    "vscode": "#8B5CF6",
     "gemini": "#5FCF80",  # was Gemini blue, same problem
     "unknown": "#9E9E9E",
 }
@@ -77,14 +79,14 @@ def context_ring_color(frac: float) -> tuple[float, float, float, float]:
     return hex_to_rgba(CONTEXT_RAMP[-1][1])
 
 
-# hat -> who wears it, for the on-screen key (HAT_MAP maps several patterns to one hat)
+# hat -> who wears it, for the on-screen key (HAT_MAP maps several patterns to one hat).
+# The propeller is deliberately absent: Gemini still gets one, it just does not earn a row.
 HAT_LEGEND = [
     ("wizard", "Fable"),
     ("top_hat", "Opus"),
     ("beret", "Sonnet"),
     ("kasa", "Haiku"),
     ("cap", "GPT / Codex"),
-    ("propeller", "Gemini"),
     ("newspaper", "any other model"),
 ]
 

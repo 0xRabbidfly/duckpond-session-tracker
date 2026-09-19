@@ -36,3 +36,5 @@ jobs:
       # The core (model, theme, adapters) has no dependencies and imports without Blender.
       - run: python tests/test_core.py
       - run: python tests/test_signals.py
+      - run: python tests/test_ledger.py
+      - run: python tests/test_usage.py

@@ -90,6 +90,15 @@ def _on_board_range(self, context):
     RT.set_board_range(self.board_range)
 
 
+def _on_limits(self, context):
+    RT.limits.enabled = self.limits
+    RT.limits.refresh_s = float(self.limits_every_min) * 60.0
+    if self.limits:
+        RT.limits.start()
+    else:
+        RT.limits.stop()
+
+
 def _on_legend(self, context):
     RT.show_legend = self.legend
 
@@ -115,6 +124,13 @@ class DuckPondSettings(bpy.types.PropertyGroup):
                                         description="Scoreboard bars and its 'this range' line (T cycles; click a tab on the board)")
     legend: bpy.props.BoolProperty(name="Legend", default=True, update=_on_legend,
                                    description="On-screen key: halo colour = state, body colour = tool, hat = model (H)")
+    limits: bpy.props.BoolProperty(name="Sangria (usage limits)", default=True, update=_on_limits,
+                                   description="Fill the two jugs from your 5-hour and 7-day limits. "
+                                               "Each refresh runs `claude -p /usage`, which spends a few tokens")
+    limits_every_min: bpy.props.IntProperty(name="Refresh (min)", default=15, min=2, max=180,
+                                            update=_on_limits,
+                                            description="How often to ask the CLI. Lower costs more tokens; "
+                                                        "the windows move slowly, so 15 minutes is plenty")
 
 
 def build_adapters(props=None):
@@ -150,6 +166,8 @@ class DUCKPOND_OT_start(bpy.types.Operator):
         RT.director.enabled = props.director
         RT.tags_for_all = props.tags_for_all
         RT.set_board_range(props.board_range)
+        RT.limits.enabled = props.limits
+        RT.limits.refresh_s = float(props.limits_every_min) * 60.0
         _on_sound(props, context)
         _on_clock(props, context)
         return {"FINISHED"}

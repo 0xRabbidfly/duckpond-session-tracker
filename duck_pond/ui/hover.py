@@ -53,12 +53,13 @@ TAG_SIZE = 19       # big enough to read across a room, small enough not to own 
 TAG_SIZE_SMALL = 12
 TAG_BG = (0.04, 0.05, 0.08, 0.52)  # see-through: a tag sits over water and ducks, not beside them
 BG = (0.04, 0.05, 0.08, 0.86)
-# (state, word, hint) for the on-screen key; idle has no halo, so its swatch is an empty ring
+# (state, word) for the on-screen key; idle has no halo, so its swatch is an empty ring.
+# No explanations: "working", "waiting", "blocked" and "idle" say what they mean.
 LEGEND_STATES = (
-    ("generating", "working", "writing or running a tool"),
-    ("awaiting_user", "waiting", "your turn"),
-    ("awaiting_permission", "blocked", "needs a permission"),
-    ("idle", "idle", "no halo, duck greyed out"),
+    ("generating", "working"),
+    ("awaiting_user", "waiting"),
+    ("awaiting_permission", "blocked"),
+    ("idle", "idle"),
 )
 
 
@@ -531,8 +532,8 @@ class DUCKPOND_OT_hover(bpy.types.Operator):
         """
         cols = []  # each: (heading, [(kind, colour, name, note), ...])
         cols.append(("HALO = STATE", [
-            ("ring", None if st == "idle" else cards.state_rgba(st), word, hint)
-            for st, word, hint in LEGEND_STATES]))
+            ("ring", None if st == "idle" else cards.state_rgba(st), word, "")
+            for st, word in LEGEND_STATES]))
         cols.append(("RING = CONTEXT", [
             ("swatch", context_ring_color(f), label, "")
             for f, label in CONTEXT_LEGEND]))

@@ -19,6 +19,7 @@ if ROOT not in sys.path:
 import duck_pond  # noqa: E402
 from duck_pond.adapters.stub import StubAdapter  # noqa: E402
 from duck_pond.runtime import RT  # noqa: E402
+from duck_pond.usage_limits import Gauge, Usage  # noqa: E402
 
 args = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else []
 
@@ -68,6 +69,10 @@ def _style(space):
 
 
 def _go():
+    # Sample limits, not the real ones: a screenshot must not spend tokens.
+    RT.limits.enabled = False
+    RT.limits.set_snapshot(Usage(session=Gauge(0.24, "Sep 19, 8:30pm"),
+                                 week=Gauge(0.62, "Sep 26, 4pm"), ok=True))
     RT.start([stub])
     RT.tags_for_all = KIOSK
     if CLOCK is not None:
