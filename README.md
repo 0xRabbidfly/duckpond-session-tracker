@@ -17,9 +17,12 @@ flashing = blocked on a permission, no light and a greyed-out duck = idle. A key
 (`H`) spells out halo, body colour and hat. Your prompts fall from the sky as amber orbs;
 finished reports rise as gold ones. Every tool call pops a coloured **chip** naming it in a
 word (`bash`, `edit`, `read`, `web`, `test`, `spawn`). Context compaction is a geyser. Errors
-bring rain. The sun follows your clock; after dark the lido lights come on and the ducks glow.
-The far deck is a **scoreboard**; each lane sign carries branches, state dots and a coin stack
-for spend. Spec: [`SPEC.md`](SPEC.md), §15 for what changed in v0.2. Code tour:
+bring rain. The ring round a duck's neck is its **context meter**, green when the window is
+empty and magenta when it is full. The sun follows your clock; after dark the lido lights come
+on and the ducks glow. A **board** across the top of the screen carries the live count and the
+spend; each lane sign on the west deck carries branches, sessions and that folder's spend; and
+two **jugs of sangria** on the far deck fill with your Anthropic 5-hour and 7-day usage.
+Spec: [`SPEC.md`](SPEC.md), §15 for what changed in v0.2. Code tour:
 [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
 
 ![The pool: four lanes, ducks with hats, ducklings on tethers, the scoreboard on the far deck](docs/media/overview.jpg)
@@ -59,7 +62,7 @@ For an always-on second monitor, put a shortcut to `DuckPond.exe --kiosk` in `sh
 
 ```bat
 DuckPond.cmd                    # APP MODE: pool only, maximised window, live Claude Code sessions
-DuckPond.cmd --kiosk --sound    # second monitor: + auto camera director, tags on every duck, sound
+DuckPond.cmd --kiosk --sound    # second monitor: + auto camera, tags on every duck, sound
 dev\launch.cmd                  # dev: live sessions with the normal Blender UI + sidebar
 dev\launch.cmd --stub           # demo fixture (4 sessions, 5 sub-agents, 75 s loop)
 dev\launch.cmd --both
@@ -76,11 +79,11 @@ clock override to preview the night lido.
 |---|---|
 | hover | card for the duck / duckling / tether under the mouse |
 | click | pin the card to that duck / duckling: it tracks it until you click elsewhere (full details in the sidebar) |
-| click a scoreboard tab | switch the board's range: `min` `hour` `day` `week` `month` |
+| click a range tab on the board | switch the board's range: `min` `hour` `day` `week` `month` |
 | `T` | cycle the board's range |
 | `H` | show / hide the on-screen key (halo = state, body colour = tool, hat = model) |
 | `K` | name + status tags on **every** duck (kiosk) |
-| `C` | director: auto camera that frames blocked ducks, questions, spawns, reports |
+| `C` | auto camera: eases in on the duck you pinned, and back out to the overview when you unpin |
 | `F` | follow the pinned duck |
 | `Home` | overview camera |
 | `L` | cycle lane cameras |
@@ -107,7 +110,8 @@ clock override to preview the night lido.
 | gold ring, then the duck fades out within a minute | a headless run (`claude -p` / Agent SDK) finished; it never waits for you |
 | `denied` chip, red ring, head-shake | you rejected its tool call |
 | amber letters stacked on the tail | prompts you typed that are queued behind this turn |
-| duck sitting low, life ring at 95 % | context window filling up |
+| the ring round its neck, green → yellow → orange → magenta | how full its context window is |
+| duck sitting low in the water | the same thing again: a full context rides low |
 | geyser + `compacted` chip, duck pops up | context compaction |
 | nose down, sitting a little lower | idle |
 | duckling on a thick lit tether | sub-agent working; thin dull = finished / idle |
@@ -116,14 +120,25 @@ clock override to preview the night lido.
 | choppy water | fleet-wide token throughput is high |
 | rain | errors in the last two minutes |
 | dark water, lido lamps, glowing ducks | it is after 20:30 on your clock |
+| a flamingo float, a beach ball, a lily pad drifting at the edge | nothing at all; the pool is a place, not only a chart |
 
-Numbers live on the deck, on purpose. The scoreboard shows `N WORKING · N WAITING · N
-BLOCKED · N IDLE`, then five range tabs (`min` `hour` `day` `week` `month`; click one or press
-`T`). Under them: spend, output tokens and sessions for the picked range (`last 24 h`), the
-same for the month so far (always), and a bar chart of spend per minute / hour / day / week /
-month with its peak. Each lane has one sign on the west deck: the folder name on top, then
-branches · sessions · the folder's spend this month, then one state-coloured dot per session;
-a coin stack (one coin per dollar) stands beside it at the pool edge.
+The board runs across the top of the screen. It reads `N WORKING · N WAITING · N BLOCKED ·
+N IDLE`, then five range tabs (`min` `hour` `day` `week` `month`; click one or press `T`).
+Under them: spend, output tokens and sessions for the picked range (`last 24 h`), the same for
+the month so far (always), and a bar chart of spend per bucket with its peak. It is drawn in
+screen space, last of everything, because it used to be a board standing on the far deck and a
+duck's name tag would park on top of it for minutes at a time.
+
+Each lane has one sign on the west deck: the folder name on top, then branches · sessions · the
+folder's spend this month, then one state-coloured dot per session. Every sign is scaled by its
+distance to the camera, so the far lane's sign is exactly the size of the near one instead of a
+third smaller.
+
+On the far deck stand two jugs of sangria, one per Anthropic limit window. How full a jug is, is
+how much of that window you have spent; the label above it gives the percentage and when the
+window clears. The numbers come from `claude -p /usage`, which is a real subprocess that spends
+a few tokens, so it runs every 15 minutes by default and the pool draws the last good answer in
+between. Both the toggle and the interval are in the sidebar; turn it off and the jugs empty.
 
 Spend is an **estimate**: every reply's tokens (input, 5-minute and 1-hour cache writes,
 cache reads, output) × that model's API list price, marked `≈$`. It is what the usage would
@@ -193,18 +208,21 @@ duck_pond/
   pricing.py         API list prices ($/MTok) for the ≈$ estimate
   theme.py           harness colours, model → hat, state colours, tool categories, redaction
   adapters/          claude_code.py (tail follower), stub.py (fixture replay), base.py
-  scene/             pool, duck (beacon, mail, glow), tether, ripples, fx (chips, orbs, geyser, rain),
-                     deck (scoreboard, lane signs, coins), sky (clock sun, night, chop, rain)
+  usage_limits.py    the 5-hour and 7-day limits, read from `claude -p /usage` on its own thread
+  scene/             pool (water, tiled deck, lawn), duck (beacon, context ring, mail, glow),
+                     tether, ripples, fx (chips, orbs, geyser, rain), deck (lane signs),
+                     pitchers (the sangria jugs), props (floating toys), sky (sun, night, chop, rain)
   sim/motion.py      per-frame motion: contract, personality, separation, body language
-  sim/director.py    auto camera (priorities + critically damped springs)
+  sim/director.py    camera: eases to the duck you pinned, critically damped; never roams
   sound.py           optional aud cues
-  ui/                cards (glance/hover/click text), hover (gpu/blf card + tags), panel
+  ui/                cards (glance/hover/click text, board model), hover (gpu/blf board,
+                     card, tags, key), panel
   runtime.py         timer (data, 4 Hz) + frame handler (motion, fx, sky, director)
   addon.py           Blender registration, preferences, operators, toggles
 launcher/            DuckPond.exe source (finds Blender, unpacks the add-on, starts the pool) + icon
 fixtures/demo.json   scripted demo: fan-out, nested + background agents, question, denial, compaction
 dev/                 launch.py|cmd, build_exe.py, render_showcase.py, gui_shot.py, render_icon.py
-tests/               core, signals, headless motion / smoke / director
+tests/               core, signals, ledger, usage, headless motion / smoke / director / watchdog
 docs/                ARCHITECTURE.md, media/
 ```
 

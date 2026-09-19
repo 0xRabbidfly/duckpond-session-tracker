@@ -7,6 +7,24 @@ All notable changes to Duck Pond are recorded here. The format follows
 ## [Unreleased]
 
 ### Added
+- **Sangria jugs**: two jugs on the far deck fill with your Anthropic 5-hour and 7-day usage,
+  with the percentage and reset time on a label above each. Read from `claude -p /usage` on a
+  worker thread every 15 minutes (`duck_pond/usage_limits.py`), with `--no-session-persistence`
+  so the reading does not itself appear in the pool as a duck. Off, and the interval, in the
+  sidebar; a headless run never starts it, so no test or render spends a token.
+- **Watchdog**: a timer that re-arms playback, the data timer, the frame handler and the
+  adapter worker when any of them stops. Playback had stopped on its own (waking from sleep),
+  which froze the pond on a stale frame for 26 minutes while the data side kept running.
+- **Context ring**: every duck wears one at all times, coloured green → yellow → orange →
+  magenta as its context window fills. It replaced a life ring that only appeared at 95 %.
+- **Pool toys**: a flamingo float, a rubber ring, two beach balls, a noodle and two lily pads
+  drifting at the edges. They carry no data, which is the point.
+- **Grass and a tiled deck**: the deck is dark grey paving, and a procedural lawn runs ninety
+  metres past it. The scene used to stop at the paving, and a window wider than the render
+  showed the world background past it as flat grey bands.
+- `tests/test_usage.py` and `tests/headless_watchdog.py`; `test_ledger.py` and `test_usage.py`
+  added to the CI matrix.
+
 - Open-source scaffolding: MIT licence, contributing guide, code of conduct, security
   policy, architecture guide, issue and pull request templates, GitHub Actions CI (ruff and
   pure tests on every push; headless Blender tests when the add-on changes).
@@ -22,6 +40,25 @@ All notable changes to Duck Pond are recorded here. The format follows
   far on a fixed line, and ≈$ bars for the range with their peak.
 
 ### Changed
+- **The board moved to the screen.** All of it -- status row, range tabs, both spend lines,
+  the sparkline and the footer -- is drawn across the top in screen space, last of everything.
+  As geometry on the far deck a duck's name tag would park on top of it, and the far half was
+  read at an angle. What it says is now a plain value (`cards.board_model`) with the drawing
+  separate, so it can be tested without reading text off mesh objects.
+- **The camera no longer roams.** It frames the duck you pinned and rests on the overview
+  otherwise; it never picks a subject of its own.
+- **Lane signs** are scaled by their distance to the camera, so every lane's sign is the same
+  size on screen, and the text is much larger. The far lane's sign used to render a third
+  smaller, which was the difference between reading its detail line and not.
+- The on-screen key is a horizontal strip along the bottom-right, hats are drawn as their own
+  silhouettes rather than colour swatches, the state rows lost their explainers, and VS Code is
+  violet -- it had sat one step from Claude Code's terracotta and read as the same swatch.
+- The tally under the hover card is labelled `WHOLE POOL`, under a divider, and no longer
+  double-counts a blocked duck as waiting.
+- Name tags are smaller and see-through, so a tag sits over the water rather than replacing it.
+- `DuckPond.exe` runs Blender unbuffered and `dev/launch.py` line-buffers its output, so
+  `%LOCALAPPDATA%\DuckPond\last-run.log` can be read while the run is still going.
+
 - App and kiosk mode no longer look *through* the pool camera: the viewport copies it every
   frame, so the pool fills the window with no dashed camera frame or darkened border.
 - Clicking a duck, duckling or tether pins its card and tag until a click lands elsewhere in
@@ -46,6 +83,17 @@ All notable changes to Duck Pond are recorded here. The format follows
   included) beside the recorded `cost-state` total; the card footer shows ≈$ today.
 - Lint clean under ruff (`E F W I B UP`); typing annotations modernised to PEP 585/604.
 - README screenshots live in `docs/media/` so they render on GitHub.
+
+### Fixed
+- **Context was pinned at 100 % on nearly every duck.** Opus was mapped to a 200K window; it
+  has had 1M since 4.6, so a session a quarter full read as about to overflow. Across the
+  transcripts on this machine that was 8,339 replies of 18,972 clamped to full. Matching is
+  version-aware now, because a family name alone cannot tell Opus 4.5 (200K) from Opus 4.6
+  (1M), and a date stamp is not a version.
+
+### Removed
+- Coin stacks beside the lane signs. The month's spend is already on the sign in figures, and
+  the stacks were what the signs had to stay clear of.
 
 ## [0.2.0] - 2026-09-10
 

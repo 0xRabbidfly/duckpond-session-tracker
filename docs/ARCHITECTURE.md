@@ -63,9 +63,9 @@ types are ignored so an adapter can be ahead of the model. Current types:
 | `ToolCall` | tool name, summary, phase (start / done / denied), ok | chips, head dip, `tool_history`, denial handling, permission inference input |
 | `Question` | the `AskUserQuestion` text | exact `awaiting_user` with the question quoted |
 | `Queue` | +1 / -1 | letters on the tail |
-| `Usage`, `CostState` | tokens, context %, USD, lines, per-model usage | waterline, coins, scoreboard, throughput history |
+| `Usage`, `CostState` | tokens, context %, USD, lines, per-model usage | waterline, context ring, board, throughput history |
 | `Compaction` | pre / post tokens | geyser, duck pops back up |
-| `TurnDone` | duration | scoreboard |
+| `TurnDone` | duration | board |
 | `PermissionMode`, `Effort` | strings | card; bypass mode disables permission inference |
 | `Error` | message | red ring, rain contribution |
 | `SubAgentSeen` | agent_id, type, description, model, parent_agent_id, spawn_depth, background | duckling + tether |
@@ -99,7 +99,7 @@ one effect in `fx.py` and one line in the README table.
 
 The sum is clamped to `MAX_YAW` (150°/s) and the position integrates `speed * dt` exactly, so
 `tests/headless_motion.py` can assert no snap, no saw, no jump, no slide for every frame.
-The director camera in `sim/director.py` follows the same idea: a critically damped spring
+The camera in `sim/director.py` follows the same idea: a critically damped spring
 on position and look-at, with a priority queue of things worth looking at.
 
 ## Blender specifics worth knowing
@@ -123,4 +123,6 @@ on position and look-at, with a priority queue of things worth looking at.
 | `tests/test_signals.py` | no | every v0.2 signal: questions, denials, compaction, queue, cost, permission inference, throughput history |
 | `tests/headless_motion.py` | yes | the smoothness contract |
 | `tests/headless_smoke.py` | yes | the demo builds every object and colour it should; renders a still |
-| `tests/headless_director.py` | yes | camera acceleration and turn bounds; sky continuity at startup |
+| `tests/headless_director.py` | yes | camera acceleration and turn bounds; that it never moves unpinned; sky continuity |
+| `tests/headless_watchdog.py` | yes | the watchdog revives playback, the data timer, the frame handler and the worker |
+| `tests/test_usage.py` | no | parsing `claude -p /usage` into the two limit gauges |

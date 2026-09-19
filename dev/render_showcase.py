@@ -20,6 +20,7 @@ import duck_pond  # noqa: E402
 from duck_pond.adapters.stub import StubAdapter  # noqa: E402
 from duck_pond.runtime import RT  # noqa: E402
 from duck_pond.scene import pool as P  # noqa: E402
+from duck_pond.usage_limits import Gauge, Usage  # noqa: E402
 
 ARGS = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else []
 OUT = os.path.join(ROOT, "out")
@@ -30,6 +31,10 @@ for obj in list(bpy.data.objects):
     bpy.data.objects.remove(obj, do_unlink=True)
 
 stub = StubAdapter(os.path.join(ROOT, "fixtures", "demo.json"), loop=False)
+# Sample limits, not the real ones: a docs render must not spend tokens.
+RT.limits.enabled = False
+RT.limits.set_snapshot(Usage(session=Gauge(0.31, "8:30pm"),
+                             week=Gauge(0.58, "Sep 26, 4pm"), ok=True))
 RT.start([stub], gui=False)
 RT.sky.clock_override = 16.5  # late afternoon for the day shots
 t0 = time.time()

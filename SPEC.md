@@ -54,7 +54,7 @@ tells you who it is and what it is doing. Idle ducks float. Thinking ducks paddl
 - **Lanes** run along the long axis. One lane per distinct working directory that has at
   least one live duck. Lane width adapts: `12 m / lane_count`, min 1.5 m. A floating
   lane-rope with alternating red/white floats separates lanes. A small deck sign at the
-  end of each lane shows the folder's last path segment (`AI-HUB-Portal`).
+  end of each lane shows the folder's last path segment (`storefront`).
 - Ducks with no working directory (unknown harness) swim in a shared "open water" lane
   at the far end.
 
@@ -130,9 +130,12 @@ The duck's behaviour is a small state machine driven by the adapter.
 | `ended` | Slow drift to nearest wall, alpha fades over 120 s, then object removed. | |
 | `error` | One hard wobble (roll 25°, 0.5 s), red ripple ring. Returns to previous state. | |
 
-**Context fill:** the duck's Z offset is `-0.12 m × (context_used / context_window)`,
-so a session at 90 % context is visibly sitting low in the water. A duck at ≥ 95 % gets a
-tiny life-ring around its neck. (This is deliberately a bit alarming.)
+**Context fill:** the duck's Z offset is `-0.12 m × (context_used / context_window)`, so a
+session at 90 % context is visibly sitting low in the water. It also wears a **context ring**
+round its neck at all times, coloured green → yellow → orange → magenta as the window fills.
+The ring used to appear only at ≥ 95 %, which said nothing for the first 94 %. It hangs the way
+a person wears one, high behind the neck and dipping into the water at the chest, because level
+at the neck it cut straight across the duck's face.
 
 **Paddling only when generating** is the key rule from the brief: motion means thought.
 A still duck is either waiting on you or idle. You should be able to glance at the pool
@@ -191,7 +194,7 @@ and count how many sessions are actually working.
 
   ```
   ● Claude Code · Fable 5.1                    generating · 4 m 12 s
-  session 9d8e617a · AI-HUB-Portal · master
+  session 9d8e617a · storefront · master
   turns 23   tokens 148k in / 21k out   context 64 %   cost $4.12
   tool: Bash — "winget install --id BlenderFoundation.Blender…"
   last prompt: "create a spec for a 3d modeling view of a swimming pool…"
@@ -332,7 +335,7 @@ share one material with per-object colour attributes.
 ## 12. Acceptance criteria (MVP)
 
 1. Start Blender with two Claude Code sessions running on this machine; within 5 s two
-   clay-coloured ducks with wizard hats appear in the `AI-HUB-Portal` lane, tail flags
+   clay-coloured ducks with wizard hats appear in the `storefront` lane, tail flags
    read the branch.
 2. Ask one session to spawn an Explore sub-agent: a duckling surfaces beside it within
    one poll interval, a tether appears, an amber packet travels down it with the prompt
@@ -424,11 +427,19 @@ You are the sky; tools are under the water; peers are on the surface.
 - **Clock**: the sun follows the PC clock; after 20:30 the lido lights come on, the water
   darkens, and the ducks glow (an emission attribute), so night shifts stay readable.
 - **Weather**: water chop follows fleet output tokens/sec; rain falls when errors pile up.
-- **Scoreboard** on the far deck: `N WORKING · N WAITING · N BLOCKED · N IDLE`, range tabs,
+- **Board** across the top of the screen (screen space, drawn last so a name tag can never
+  cover it): `N WORKING · N WAITING · N BLOCKED · N IDLE`, range tabs,
   spend for the picked range and for the month so far, and ≈$ bars as real geometry (§16
   replaced v0.2's live-session spend and 30-minute token sparkline).
 - **Lane signs**: folder (kept), plus branch line, session count, the folder's ≈$ this month
-  (§16), one state-coloured dot per session, and a **coin stack** (one coin per dollar) on the deck.
+  (§16) and one state-coloured dot per session. Each sign is scaled by its distance to the
+  camera, so every lane's sign is the same size on screen.
+- **Sangria jugs** on the far deck, one per Anthropic limit window (5-hour, 7-day): the fill is
+  the fraction spent, the label above gives the percentage and the reset time. Read from
+  `claude -p /usage` on a worker thread every 15 minutes, with `--no-session-persistence` so
+  the reading does not itself turn up in the pool as a duck.
+- **Pool toys** (a flamingo float, a rubber ring, beach balls, a noodle, lily pads) drifting at
+  the edges. They carry no data; every other object in the scene is a readout.
 
 ### 15.5 Sub-agents
 - Nested agents (spawnDepth 2) orbit their parent *duckling*, not the session duck.
@@ -446,17 +457,18 @@ You are the sky; tools are under the water; peers are on the surface.
 - Click: the sidebar — everything above plus spend per model, sub-agent list, packets, last tools.
 
 ### 15.7 Cameras and sound
-- `C` **director**: an auto camera for a second monitor. Priorities: blocked > question >
-  spawn > compaction > error > done > prompt, then the hardest-working duck, with an
-  overview beat every 40 s. Critically damped springs on position and look-at;
-  `tests/headless_director.py` bounds the camera's second difference and turn rate.
-- `--kiosk` launcher flag = fullscreen + director + tags on all. `--sound` / `S`: synthesised
+- `C` **auto camera** for a second monitor. It frames the duck you pinned and rests on the
+  overview when nothing is pinned; it never picks a subject of its own, so an unattended pool
+  holds the wide shot however loud it gets. Critically damped springs on position and look-at;
+  `tests/headless_director.py` bounds the camera's second difference and turn rate, and asserts
+  it does not move at all through a storm of events with nothing pinned.
+- `--kiosk` launcher flag = fullscreen + auto camera + tags on all. `--sound` / `S`: synthesised
   cues via `aud` (prompt bloop, report chime, question ding, error buzz, geyser, tests).
 
 ### 15.8 Contract and tests
 `tests/headless_motion.py` unchanged and green. New: `tests/test_signals.py` (reducers,
 adapter parsing, inference), `tests/headless_director.py` (camera + world continuity),
-extended `tests/headless_smoke.py` (beacons, chips, board, coins, nested/background
+extended `tests/headless_smoke.py` (beacons, chips, board model, jugs, context ring, nested/background
 ducklings, compaction pop, inferred block, denial). `dev/render_showcase.py` renders
 `out/showcase_*.png` and `out/showcase_clip.mp4`; `dev/gui_shot.py` screenshots the real
 GUI overlay.
@@ -464,7 +476,8 @@ GUI overlay.
 ### 15.9 Considered and not kept
 - A harbour (ships, tugs, cranes) instead of a pool: stronger for tools-as-cranes, weaker
   for the one thing that matters most, which is counting who is paddling. Kept the pool.
-- Cost as duck size: funny, but it hides the model hat and makes lanes unreadable. Coins.
+- Cost as duck size: funny, but it hides the model hat and makes lanes unreadable. Coin
+  stacks replaced it, and those went too: the figure was already on the sign beside them.
 - Text on every packet: a wall of text at three ducklings. Hover-level now.
 
 ## 16. Usage ledger and range picker (built 2026-09-13)
@@ -524,11 +537,11 @@ Lane signs show the folder's month-to-date ≈$; the hover card shows the sessio
   the text (`pool.add_badge` / `fit_badge`, fitted from the data timer because it evaluates the
   depsgraph); branch flags too. Session ducks scale 1.35 (was 1.6).
 - **Lane signs**: `deck.LaneSigns` owns the whole sign: a screen-aligned root with a plate,
-  folder name, branch · sessions · ≈$ line and state dots as children; the coin stack stands
+  folder name, branch · sessions · ≈$ line and state dots as children; the sign scales
   beside it. `pool.Lanes` only lays out lanes and ropes.
 
 ### 16.5 Tests
 `tests/test_ledger.py` (pricing, de-duplication, local boundaries across midnight, Monday and
 the 1st, per-session / per-folder spend, synthetic backfill, live event fields);
 `tests/test_core.py::test_backfill_real_logs`; `tests/headless_smoke.py` (tabs, both lines, bar
-counts per range, underline, month coin stack).
+counts per range, the selected tab, and that no board geometry is left in the scene).
