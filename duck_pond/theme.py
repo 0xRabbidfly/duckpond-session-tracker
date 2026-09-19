@@ -49,6 +49,34 @@ HAT_COLORS = {
     "newspaper": "#E8E4D8",
 }
 
+# The ring around a duck's neck is its context gauge: always on, colour only. Green -> yellow
+# -> magenta, picked to clear two things it sits next to: the duck's own salmon body (so the
+# ring never blends into it) and the state halo's teal/amber/red (so a full duck and a blocked
+# duck can never be confused at a glance).
+CONTEXT_RAMP = [
+    (0.00, "#22C55E"),
+    (0.45, "#FFE14D"),
+    (0.75, "#FF7A1A"),
+    (1.00, "#FF2FD0"),
+]
+# (fraction, label) for the on-screen key
+CONTEXT_LEGEND = [(0.0, "empty"), (0.45, "half"), (0.75, "filling"), (1.0, "full")]
+
+
+def context_ring_color(frac: float) -> tuple[float, float, float, float]:
+    """Colour for a context fill of `frac`, interpolated along CONTEXT_RAMP."""
+    f = max(0.0, min(1.0, frac))
+    lo = CONTEXT_RAMP[0]
+    for hi in CONTEXT_RAMP[1:]:
+        if f <= hi[0]:
+            span = hi[0] - lo[0]
+            k = 0.0 if span <= 0 else (f - lo[0]) / span
+            a, b = hex_to_rgba(lo[1]), hex_to_rgba(hi[1])
+            return tuple(a[i] + (b[i] - a[i]) * k for i in range(4))
+        lo = hi
+    return hex_to_rgba(CONTEXT_RAMP[-1][1])
+
+
 # hat -> who wears it, for the on-screen key (HAT_MAP maps several patterns to one hat)
 HAT_LEGEND = [
     ("wizard", "Fable"),

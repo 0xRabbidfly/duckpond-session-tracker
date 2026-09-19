@@ -1,10 +1,13 @@
-"""Auto camera for a second monitor: the director watches the fleet and frames what matters.
+"""Camera for a second monitor: it frames the duck you focus, and nothing else.
 
-Priorities (highest first): a duck blocked on a permission, a duck asking you a question, a
-fresh sub-agent fan-out, a compaction geyser, a finished report, then whoever is generating
-hardest. Between beats it returns to the overview. The camera position is critically damped
-(a velocity-state spring), so the path is C1-continuous however abruptly the target changes;
-tests/headless_director.py asserts the second difference stays bounded.
+The camera rests on the overview. Focus a duck -- click it, or press F to follow it -- and the
+camera springs in to frame it and its ducklings; drop the focus and it springs back out. It
+never picks a target of its own: an unattended pool holds the wide shot no matter what happens
+in it, so the view only ever moves because you moved it.
+
+The position is critically damped (a velocity-state spring), so the path is C1-continuous
+however abruptly the focus changes; tests/headless_director.py asserts the second difference
+stays bounded.
 """
 from __future__ import annotations
 
@@ -16,78 +19,32 @@ from ..scene import pool as P
 
 Key = tuple[str, str]
 
-PRIORITY = {"blocked": 100, "question": 80, "spawn": 60, "compaction": 55, "error": 50, "done": 35, "prompt": 30}
-HOLD_S = 9.0          # how long a beat holds the camera
-OVERVIEW_EVERY_S = 40.0
-COOLDOWN_S = 30.0     # do not revisit the same duck sooner than this
-
 
 class Director:
     def __init__(self) -> None:
         self.enabled = False
         self.target: Key | None = None
-        self.target_until = 0.0
-        self.last_overview = 0.0
-        self.last_visit: dict[Key, float] = {}
-        self.notices: dict[Key, tuple[int, float]] = {}
         self.vel = Vector((0.0, 0.0, 0.0))
         self.look = Vector(P.CAM_OVERVIEW[1])
         self.look_vel = Vector((0.0, 0.0, 0.0))
         self.mode = "overview"
 
-    def notice(self, key: Key, kind: str, now: float) -> None:
-        pr = PRIORITY.get(kind, 10)
-        cur = self.notices.get(key)
-        if cur is None or pr >= cur[0]:
-            self.notices[key] = (pr, now)
-
-    # ------------------------------------------------------------ choose
-    def _pick(self, fleet, ducks, now: float) -> Key | None:
-        best, best_score = None, -1.0
-        for key, (pr, at) in list(self.notices.items()):
-            if now - at > 30.0 or key not in ducks:
-                del self.notices[key]
-                continue
-            if now - self.last_visit.get(key, -1e9) < COOLDOWN_S and pr < 100:
-                continue
-            score = pr - (now - at) * 0.5
-            if score > best_score:
-                best, best_score = key, score
-        if best is not None:
-            return best
-        # nothing happened: the hardest-working duck, if any
-        live = [(s.tokens_per_sec(now), (s.id, "")) for s in fleet.live_sessions()
-                if s.state in ("generating", "tool_running") and (s.id, "") in ducks]
-        live = [(t, k) for t, k in live if now - self.last_visit.get(k, -1e9) > COOLDOWN_S]
-        if live:
-            live.sort(reverse=True)
-            return live[0][1]
-        return None
-
     # ------------------------------------------------------------ step
-    def step(self, fleet, ducks, lanes, cam, now: float, dt: float) -> None:
+    def step(self, fleet, ducks, lanes, cam, now: float, dt: float, focus: Key | None = None) -> None:
+        """Ease the camera toward `focus`, or back to the overview when there is none."""
         if cam is None:
             return
-        if now >= self.target_until:
-            key = self._pick(fleet, ducks, now)
-            if key is not None and (self.mode == "overview" or now - self.last_overview < OVERVIEW_EVERY_S):
-                self.target = key
-                self.mode = "duck"
-                self.last_visit[key] = now
-                self.notices.pop(key, None)
-            else:
-                self.target = None
-                self.mode = "overview"
-                self.last_overview = now
-            self.target_until = now + HOLD_S
-        d = ducks.get(self.target) if self.target else None
+        d = ducks.get(focus) if focus else None
+        self.target = focus if d is not None else None
+        self.mode = "duck" if d is not None else "overview"
         if d is None:
             desired_pos, desired_look = Vector(P.CAM_OVERVIEW[0]), Vector(P.CAM_OVERVIEW[1])
         else:
             try:
                 t = Vector(d.obj.location)
-            except ReferenceError:
+            except ReferenceError:  # the duck left while we were framing it
                 self.target = None
+                self.mode = "overview"
                 return
             # three-quarter view from the south side, a touch above, framing the duck and its ducklings
             desired_pos = Vector((t.x - 2.6, t.y - 4.4, 2.6))

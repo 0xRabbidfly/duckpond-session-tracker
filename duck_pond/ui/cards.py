@@ -32,6 +32,10 @@ def fmt_tokens(n: int) -> str:
     return str(n)
 
 
+def plural(n: int, word: str) -> str:
+    return f"{n} {word}" if n == 1 else f"{n} {word}s"
+
+
 def fmt_elapsed(seconds: float) -> str:
     seconds = max(0, int(seconds))
     h, rem = divmod(seconds, 3600)
@@ -236,8 +240,14 @@ def tag_for(fleet: Fleet, key: tuple[str, str], now: float, redact_on: bool) -> 
     return name_for(fleet, key, redact_on), status, a.state
 
 
+TOTALS_SCOPE = "WHOLE POOL"  # the footer sits under a card about one duck; say what it counts
+
+
 def totals_line(fleet: Fleet, now: float) -> str:
+    """The pond-wide tally drawn under the card. It is deliberately labelled and worded so it
+    cannot be read as belonging to the duck above it: every count names what it counts."""
     t = fleet.totals(now)
     blocked = f" · {t['blocked']} blocked" if t["blocked"] else ""
-    return (f"{t['ducks']} ducks · {t['ducklings']} ducklings · {t['active']} active · {t['waiting']} waiting{blocked} · "
+    return (f"{TOTALS_SCOPE}  ·  {plural(t['ducks'], 'duck')} · {plural(t['ducklings'], 'duckling')} · "
+            f"{t['active']} of them active · {t['waiting']} waiting{blocked} · "
             f"{fmt_tokens(t['tokens_per_min'])} tok/min · ≈${fleet.ledger.today(now).usd:.2f} today")

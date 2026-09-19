@@ -96,9 +96,11 @@ def test_denial_flow():
 def test_compaction_queue_cost():
     f = _fleet()
     s = f.sessions["s1"]
-    f.apply({"type": "Usage", "session_id": "s1", "tokens_in": 100, "tokens_out": 50, "context_used": 190000, "at": T + 1})
-    assert s.context_frac > 0.9
-    f.apply({"type": "Compaction", "session_id": "s1", "pre_tokens": 190000, "post_tokens": 20000, "at": T + 2})
+    # 950k of Opus 5's 1M window: nearly full. (These were 190k/200k before the context
+    # windows were corrected -- Opus has had a 1M window since 4.6.)
+    f.apply({"type": "Usage", "session_id": "s1", "tokens_in": 100, "tokens_out": 50, "context_used": 950000, "at": T + 1})
+    assert s.context_window == 1_000_000 and s.context_frac > 0.9, (s.context_window, s.context_frac)
+    f.apply({"type": "Compaction", "session_id": "s1", "pre_tokens": 950000, "post_tokens": 100000, "at": T + 2})
     assert s.compactions == 1 and s.context_frac < 0.2 and s.last_compaction_at == T + 2
     assert _cues(f, "compaction")[0].at == T + 2
     f.apply({"type": "Queue", "session_id": "s1", "op": "enqueue", "text": "and then…", "at": T + 3})

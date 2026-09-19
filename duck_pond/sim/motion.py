@@ -357,7 +357,7 @@ class Motion:
             alpha = max(0.0, 1.0 - (now - s.ended_at) / FADE_S)
         d.place(st.x, st.y, st.z, st.heading, st.pitch, st.roll)
         d.set_alpha(alpha)
-        d.set_lifering(frac >= 0.95)
+        d.set_context(frac)
         d.set_flag(s.branch or "")
         d.set_label(redact(s.display_name, self.redact, 24))  # the full name is on the hover card
         self._beacon(d, s, now, st, ripples, alpha)
@@ -465,6 +465,7 @@ class Motion:
                 st.roll += math.radians(25) * math.sin(math.pi * kk) * (1.0 - kk)
             self._fx(st, sub, d.obj.scale.x, ripples, now, dt)
             self._beacon(d, sub, now, st, ripples)
+            d.set_context(sub.context_frac)
             d.set_glow(self._glow(key, sub.state))
         st.scale = scale_mul
         d.place(st.x, st.y, st.z, st.heading, st.pitch, st.roll, scale_mul)

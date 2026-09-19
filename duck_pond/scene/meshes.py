@@ -206,13 +206,14 @@ def sphere_mesh(name: str, r: float, mat) -> bpy.types.Mesh:
     return b.finish(name, [mat])
 
 
-def lifering_mesh(mat_a, mat_b) -> bpy.types.Mesh:
+def lifering_mesh(mat) -> bpy.types.Mesh:
+    """The ring a duck wears: one material, coloured per duck from its object colour."""
     me = _existing("LifeRing")
     if me:
         return me
     b = _Builder()
     b.torus(0.175, 0.03, slot=0)
-    return b.finish("LifeRing", [mat_a, mat_b])
+    return b.finish("LifeRing", [mat])
 
 
 def box_mesh(name: str, sx, sy, sz, mat, at=(0, 0, 0)) -> bpy.types.Mesh:

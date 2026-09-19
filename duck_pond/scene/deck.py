@@ -7,6 +7,7 @@ from __future__ import annotations
 import time
 
 import bpy
+from mathutils import Vector
 
 from ..ledger import RANGE_ORDER, RANGES
 from ..theme import STATE_COLORS, hex_to_rgba, redact
@@ -25,6 +26,11 @@ COINS_MAX = 24
 SIGN_W = 1.7  # lane sign plate, screen-aligned
 SIGN_H = 0.62
 SIGN_X = -1.15  # centre on the west deck, clear of the coin stack at the pool edge
+# Signs are scaled by their distance to the camera so every lane's sign is the same size on
+# screen. Without it the far lane renders about a third smaller than the near one, which is
+# the difference between reading its branch and spend line and not.
+SIGN_REF_DIST = 17.4  # metres: the overview camera's distance to the middle of the sign row
+SIGN_SCALE_RANGE = (0.6, 2.5)
 COIN_X = -0.12  # the coin stack stands at the pool edge, beside the sign
 SIGN_NAME_CHARS = 17
 SIGN_SUB_CHARS = 30
@@ -248,6 +254,31 @@ class LaneSigns:
         d = {"root": root, "plate": plate, "name": name, "sub": sub, "dots": dots, "coins": coins, "y": y}
         self.objects[key] = d
         return d
+
+    def scale_to_camera(self, cam) -> None:
+        """Keep every lane sign the same size on screen, whatever its distance.
+
+        Apparent size goes as scale / distance under perspective, so scaling each sign by its
+        own distance cancels the falloff exactly. Called per frame: the camera moves.
+        """
+        if cam is None:
+            return
+        try:
+            eye = Vector(cam.location)
+        except (AttributeError, ReferenceError):
+            return
+        lo, hi = SIGN_SCALE_RANGE
+        for d in self.objects.values():
+            root = d.get("root")
+            if root is None:
+                continue
+            try:
+                k = (Vector(root.location) - eye).length / SIGN_REF_DIST
+            except ReferenceError:
+                continue
+            k = max(lo, min(hi, k))
+            if abs(root.scale.x - k) > 1e-4:
+                root.scale = (k, k, k)
 
     def update(self, lanes, fleet, now: float, redact_on: bool) -> None:
         if now - self.last_update < 1.0:

@@ -87,7 +87,7 @@ check(RT.motion.states[("cc-fable-1", "")].speed > 0.3, "generating duck paddles
 _opus = RT.motion.states[("cc-opus-2", "")]
 check(_opus.speed < 0.05 or _opus.relocating, "waiting duck floats still (unless paddling to a re-laid lane)")
 check(len(RT.ripples.active_rings) > 0, "water has active ripple rings")
-check(obj("DP_Duck_cc-opus-2").location.z < -0.08, "opus at 91 % context sits low in the water")
+check(obj("DP_Duck_cc-opus-2").location.z < -0.08, "opus at 91 % of its 1M context sits low in the water")
 check(obj("DP_Duck_vscode-4").rotation_euler.y > 0.1, "tool-running duck dips its head")
 # --- reimagined: glance-level state, the deck dashboard, the world
 check(not obj("DP_Duck_cc-opus-2_beacon").hide_viewport and obj("DP_Duck_cc-opus-2_beacon").color[0] > 0.8 and obj("DP_Duck_cc-opus-2_beacon").color[2] < 0.2,

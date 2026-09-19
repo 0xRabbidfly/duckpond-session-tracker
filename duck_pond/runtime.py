@@ -265,11 +265,7 @@ class Runtime:
             elif cue.kind == "error_ripple":
                 if fresh:
                     self.motion.ripple_for(key, self.ducks, self.ripples, error=True)
-                    self.director.notice(key, "error", now)
                     self._sound("error")
-            elif cue.kind == "spawn_sub":
-                if fresh:
-                    self.director.notice(key, "spawn", now)
             elif cue.kind == "ripple":
                 self.motion.ripple_for(key, self.ducks, self.ripples)
             elif cue.kind == "packet":
@@ -313,17 +309,13 @@ class Runtime:
             def land(p, key=key):
                 self.motion.ripple_for(key, self.ducks, self.ripples, big=True)
             self.fx.prompt_drop(pos + Vector((0.0, 0.0, 0.25)), on_land=land)
-            self.director.notice(key, "prompt", now)
             self._sound("prompt")
         elif k == "report_up":
             self.fx.report_up(pos + Vector((0.0, 0.0, 0.3)))
             self.ripples.ring(Vector((pos.x, pos.y, 0.0)), size=1.6, color=(1.0, 0.85, 0.35), strength=0.8, life=2.2)
-            self.director.notice(key, "done", now)
             self._sound("done")
         elif k == "tool_chip":
             self.fx.tool_chip(pos, str(cue.payload))
-            if cue.payload == "agent":
-                self.director.notice(key, "spawn", now)
         elif k == "tool_done":
             cat, ok = cue.payload
             self.fx.tool_done(pos, cat, ok)
@@ -336,17 +328,14 @@ class Runtime:
         elif k == "denied":
             self.fx.denied(pos, str(cue.payload))
             self.motion.ripple_for(key, self.ducks, self.ripples, error=True)
-            self.director.notice(key, "blocked", now)
             self._sound("error")
         elif k == "question":
             self.fx.question(pos)
-            self.director.notice(key, "question", now)
             self._sound("question")
         elif k == "queued":
             self.fx.queued(pos)
         elif k == "compaction":
             self.fx.geyser(pos, self.ripples)
-            self.director.notice(key, "compaction", now)
             self._sound("geyser")
         elif k == "done":
             pass  # the hop is in the motion layer; report_up carries the visual
@@ -392,8 +381,10 @@ class Runtime:
         self.ripples.update(dt)
         self.fx.update(dt)
         self.sky.update(now, dt)
+        self.signs.scale_to_camera(cam)  # every lane sign the same size on screen
         if self.director.enabled and self.motion.follow is None:
-            self.director.step(self.fleet, self.ducks, self.lanes, cam, now, dt)
+            # only what you pinned; the camera never goes hunting on its own
+            self.director.step(self.fleet, self.ducks, self.lanes, cam, now, dt, focus=self.pinned)
         if self.view_locked and not bpy.app.background:
             self.lock_views(cam)
 

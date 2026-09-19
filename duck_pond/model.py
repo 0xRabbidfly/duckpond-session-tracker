@@ -1,6 +1,7 @@
 """Fleet state and the event reducer. Pure Python, no bpy — testable outside Blender."""
 from __future__ import annotations
 
+import re
 import time
 from collections import deque
 from dataclasses import dataclass, field
@@ -10,16 +11,57 @@ from .theme import tool_category
 
 STATES = ("generating", "tool_running", "awaiting_user", "awaiting_permission", "idle", "ended", "error")
 
-CONTEXT_WINDOWS = {"fable": 1_000_000, "opus": 200_000, "sonnet": 200_000, "haiku": 200_000}
 DEFAULT_CONTEXT_WINDOW = 200_000
+BIG_CONTEXT_WINDOW = 1_000_000
+# The version at which a family's window grew to 1M. Fable and Mythos only ever existed at 5+,
+# so they are always big; Haiku has no 1M model yet, so it is never big. Matching has to be
+# version-aware: "opus" alone is wrong, because Opus 4.5 is a 200K model and Opus 4.6 is not.
+BIG_CONTEXT_FROM = {"fable": (0, 0), "mythos": (0, 0), "opus": (4, 6), "sonnet": (4, 6)}
+FAMILIES = ("fable", "mythos", "opus", "sonnet", "haiku")
+
+
+def model_version(model: str) -> tuple[int, int] | None:
+    """(major, minor) read from a model id, or None when it does not carry one.
+
+    Ids are read as hyphen-separated tokens so a date stamp is never mistaken for a version:
+    `claude-opus-4-8` is 4.8, `claude-haiku-4-5-20251001` is 4.5, and the old-style
+    `claude-3-7-sonnet-20250219`, whose digits come before the family, yields None.
+    """
+    tokens = re.split(r"[^a-z0-9]+", (model or "").lower())
+    for i, tok in enumerate(tokens):
+        if tok not in FAMILIES:
+            continue
+        nums = []
+        for nxt in tokens[i + 1:i + 3]:
+            if not (nxt.isdigit() and len(nxt) <= 2):
+                break
+            nums.append(int(nxt))
+        if not nums:
+            return None
+        return (nums[0], nums[1] if len(nums) > 1 else 0)
+    return None
 
 
 def context_window_for(model: str) -> int:
+    """The model's context window in tokens.
+
+    Wrong values here are not cosmetic: a 1M-context session measured against a 200K window
+    pins the context meter at 100 % for most of its life, which reads as "about to run out"
+    when it is in fact a quarter full.
+    """
     m = (model or "").lower()
-    for k, v in CONTEXT_WINDOWS.items():
-        if k in m:
-            return v
-    return DEFAULT_CONTEXT_WINDOW
+    if "[1m]" in m:  # Claude Code marks the 1M-context variant of a model this way
+        return BIG_CONTEXT_WINDOW
+    family = next((f for f in FAMILIES if f in m), None)
+    if family is None:
+        return DEFAULT_CONTEXT_WINDOW
+    floor = BIG_CONTEXT_FROM.get(family)
+    if floor is None:  # a family with no big-context model
+        return DEFAULT_CONTEXT_WINDOW
+    version = model_version(m)
+    if version is None:  # old-style id (claude-3-7-sonnet-...): those predate the 1M window
+        return DEFAULT_CONTEXT_WINDOW
+    return BIG_CONTEXT_WINDOW if version >= floor else DEFAULT_CONTEXT_WINDOW
 
 
 @dataclass

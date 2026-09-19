@@ -11,8 +11,14 @@ sys.path.insert(0, ROOT)
 
 from duck_pond.adapters.claude_code import ClaudeCodeAdapter  # noqa: E402
 from duck_pond.adapters.stub import StubAdapter  # noqa: E402
-from duck_pond.model import Fleet  # noqa: E402
-from duck_pond.theme import hat_for_model, redact  # noqa: E402
+from duck_pond.model import Fleet, context_window_for, model_version  # noqa: E402
+from duck_pond.theme import (  # noqa: E402
+    CONTEXT_LEGEND,
+    CONTEXT_RAMP,
+    context_ring_color,
+    hat_for_model,
+    redact,
+)
 
 
 def test_redact():
@@ -171,6 +177,59 @@ def test_session_title_precedence():
         f.apply(e)
     assert s.title == "forgeai", "a custom title is never overridden by an AI title"
     assert s.display_name == "forgeai"
+
+
+def test_context_ring_ramp():
+    """The ring is the only thing showing context now, so its ramp has to be total and ordered."""
+    stops = [f for f, _ in CONTEXT_RAMP]
+    assert stops == sorted(stops) and stops[0] == 0.0 and stops[-1] == 1.0, stops
+    assert context_ring_color(0.0) == context_ring_color(-5.0), "clamps below zero"
+    assert context_ring_color(1.0) == context_ring_color(9.9), "clamps above one"
+    for f in (0.0, 0.1, 0.45, 0.6, 0.75, 0.9, 1.0):
+        rgba = context_ring_color(f)
+        assert len(rgba) == 4 and all(0.0 <= c <= 1.0 for c in rgba), (f, rgba)
+    # it has to actually move: an empty duck and a full one must not look the same
+    assert context_ring_color(0.0)[:3] != context_ring_color(1.0)[:3]
+    # every legend swatch names a real point on the ramp
+    for f, label in CONTEXT_LEGEND:
+        assert 0.0 <= f <= 1.0 and label, (f, label)
+
+
+def test_context_window_per_model():
+    """A 1M-context session measured against a 200K window sits at 100 % for most of its life,
+    which reads as 'about to run out' when it is a quarter full. Version matters: Opus 4.5 is a
+    200K model and Opus 4.6 is not, so a bare family substring gets this wrong."""
+    big = [
+        "claude-opus-5", "claude-opus-5[1m]", "claude-opus-4-8", "claude-opus-4-7",
+        "claude-opus-4-6", "claude-sonnet-5", "claude-sonnet-4-6",
+        "claude-fable-5", "claude-fable-5-1", "claude-mythos-5-1",
+    ]
+    small = [
+        "claude-opus-4-5", "claude-opus-4-5-20251101", "claude-sonnet-4-5",
+        "claude-haiku-4-5", "claude-haiku-4-5-20251001",
+        "claude-3-7-sonnet-20250219", "claude-3-5-haiku-20241022",
+        "<synthetic>", "", None,
+    ]
+    for m in big:
+        assert context_window_for(m) == 1_000_000, f"{m} should be a 1M-context model"
+    for m in small:
+        assert context_window_for(m) == 200_000, f"{m} should be a 200K-context model"
+
+    assert model_version("claude-opus-4-8") == (4, 8)
+    assert model_version("claude-opus-5") == (5, 0)
+    assert model_version("claude-haiku-4-5-20251001") == (4, 5), "a date stamp is not a version"
+    assert model_version("claude-3-7-sonnet-20250219") is None, "old-style ids carry no readable version"
+
+    # and the meter that reads it
+    f = Fleet()
+    now = time.time()
+    f.apply({"type": "SessionSeen", "session_id": "s", "harness": "claude_code", "cwd": "C:/p", "at": now})
+    f.apply({"type": "ModelChanged", "session_id": "s", "model": "claude-opus-5", "at": now})
+    f.apply({"type": "Usage", "session_id": "s", "tokens_in": 1000, "tokens_out": 10,
+             "context_used": 250_000, "key": "k1", "at": now})
+    s = f.sessions["s"]
+    assert s.context_window == 1_000_000, s.context_window
+    assert 0.24 < s.context_frac < 0.26, f"250k of 1M should read a quarter full, not {s.context_frac}"
 
 
 if __name__ == "__main__":

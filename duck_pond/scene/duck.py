@@ -1,10 +1,10 @@
-"""Duck / duckling objects with hats, tail flags, status bubbles and life rings."""
+"""Duck / duckling objects with hats, tail flags, status bubbles and context rings."""
 from __future__ import annotations
 
 import bpy
 from mathutils import Vector
 
-from ..theme import HAT_COLORS, harness_color, hat_for_model
+from ..theme import HAT_COLORS, context_ring_color, harness_color, hat_for_model
 from . import materials as M
 from . import meshes as MS
 from . import pool as P
@@ -118,12 +118,16 @@ class DuckObj:
         self.halo["dp_session_id"] = session_id
         self.halo["dp_agent_id"] = agent_id
         self.halo_color = (0.5, 0.5, 0.5, 0.0)
+        # The ring is the context gauge: always worn, and its colour is how full the context is.
+        # A ring that only appeared at 95 % told you nothing for the first 94 %.
         self.lifering = P.new_object(f"{name}_ring", MS.lifering_mesh(
-            M.flat_material("LifeRingA", "#FF5A36", roughness=0.6), M.flat_material("LifeRingB", "#FFFFFF")))
+            M.object_color_material("ContextRing", roughness=0.3, emission=0.25, alpha_from_object=False)))
         self.lifering.parent = self.obj
         self.lifering.location = (0.16, 0.0, 0.12)
-        self.lifering.hide_viewport = True
-        self.lifering.hide_render = True
+        self.lifering["dp_kind"] = "hat"  # hovering the ring hovers the duck
+        self.lifering["dp_session_id"] = session_id
+        self.lifering["dp_agent_id"] = agent_id
+        self.ring_color = None
         self.obj["dp_glow"] = 0.0
         # beacon: a pole with a light on top that comes on when the duck needs you. Legible
         # from across the room, which the "?" glyph alone was not.
@@ -253,10 +257,12 @@ class DuckObj:
             self.halo_color = color
             self.halo.color = color
 
-    def set_lifering(self, show: bool) -> None:
-        if self.lifering.hide_viewport == show:
-            self.lifering.hide_viewport = not show
-            self.lifering.hide_render = not show
+    def set_context(self, frac: float) -> None:
+        """Colour the ring for a context fill of `frac` (0..1)."""
+        col = context_ring_color(frac)
+        if col != self.ring_color:
+            self.ring_color = col
+            self.lifering.color = col
 
     # ------------------------------------------------------------ transform
     def place(self, x: float, y: float, z: float, heading: float, pitch: float, roll: float, scale_mul: float = 1.0) -> None:

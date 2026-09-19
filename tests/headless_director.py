@@ -1,13 +1,13 @@
-"""Headless camera test: the director may never snap the camera, whatever the fleet does.
+"""Headless camera test: the camera moves only when you focus a duck, and never snaps.
 
     blender -b --python tests/headless_director.py
 
-Drives the runtime at 30 fps with the director on while sessions appear, get blocked, ask
-questions, spawn ducklings and finish — the events that make the director change target —
-and asserts for every frame:
+Drives the runtime at 30 fps while sessions appear, get blocked, ask questions, spawn
+ducklings and finish — everything that used to make the camera go hunting — and asserts:
+  * with nothing focused the camera never leaves the overview, however loud the pool gets,
+  * focusing a duck frames it, and dropping the focus returns to the overview,
   * camera position 2nd difference stays under a bound (no cuts, no overshoot spikes),
   * the camera's forward vector never turns more than MAX_CAM_TURN per frame,
-  * the director did visit more than one target (so the test exercised retargeting),
   * the sky's chop, night and rain values are continuous (no jumps > 0.05 per frame).
 """
 import math
@@ -57,6 +57,7 @@ def ev(**kw):
 cam = P.camera()
 pos_hist, fwd_hist, targets = [], [], set()
 sky_hist = []
+OVERVIEW = Vector(P.CAM_OVERVIEW[0])
 
 
 def run(frames):
@@ -100,6 +101,29 @@ ev(type="Compaction", session_id="a", pre_tokens=180000, post_tokens=20000)
 run(400)
 check(RT.fleet.sessions["c"].state == "awaiting_user", "a denied tool leaves the duck waiting for you")
 
+# --- unattended: every one of those events happened with nothing focused
+drift = max((p - OVERVIEW).length for p in pos_hist)
+check(drift < 1e-6, f"camera never left the overview unattended (max drift {drift:.6f} m)")
+check(targets == {None}, f"the camera picked no target of its own: {sorted(t for t in targets if t)}")
+unattended_frames = len(pos_hist)
+
+# --- focus a duck: now, and only now, the camera goes in
+RT.pinned = ("a", "")
+run(150)
+framed = pos_hist[-1]
+d = RT.ducks[("a", "")]
+check((framed - OVERVIEW).length > 1.0, f"focusing a duck moves the camera in ({(framed - OVERVIEW).length:.2f} m)")
+check(RT.director.target == ("a", ""), f"the focused duck is the target ({RT.director.target})")
+check((framed - Vector(d.obj.location)).length < 8.0, "the camera ends up near the duck it framed")
+
+# --- drop the focus: back out to the overview
+RT.pinned = None
+run(300)
+check((pos_hist[-1] - OVERVIEW).length < 0.35,
+      f"dropping the focus returns to the overview ({(pos_hist[-1] - OVERVIEW).length:.2f} m out)")
+check(RT.director.target is None, "no target once the focus is dropped")
+check(len(pos_hist) > unattended_frames, "the focus phases actually ran")
+
 # --- camera continuity
 acc = 0.0
 for i in range(1, len(pos_hist) - 1):
@@ -110,9 +134,6 @@ turn = 0.0
 for a, b in zip(fwd_hist, fwd_hist[1:]):
     turn = max(turn, a.angle(b, 0.0))
 check(turn <= MAX_CAM_TURN, f"camera max turn per frame {math.degrees(turn):.2f} deg <= {math.degrees(MAX_CAM_TURN):.2f}")
-visited = {k for k in targets if k}
-check(len(visited) >= 2, f"director visited several ducks: {sorted(visited)}")
-check(None in targets, "director returned to the overview at least once")
 # --- world continuity
 jump = 0.0
 for a, b in zip(sky_hist, sky_hist[1:]):
