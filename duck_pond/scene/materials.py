@@ -256,9 +256,73 @@ def deck_material() -> bpy.types.Material:
 
 
 def grass_material() -> bpy.types.Material:
-    """The lawn past the deck. Before it, the scene simply stopped at the paving and the world
-    background showed through as flat grey bands at the edges of a wide window."""
-    return flat_material("Grass", "#4C7A38", roughness=0.95)
+    """The lawn past the deck: procedural, because a flat green plane reads as a green plane.
+
+    Three layers on object coordinates. A fine noise mottles the blade colour, a coarse one
+    puts patches of darker and yellower growth across it, and a wave gives the mown stripes a
+    lawn gets from a roller. The same fine noise drives a bump, so the surface catches the sun
+    unevenly instead of behaving like paint. No image textures: Duck Pond ships no assets.
+    """
+    mat = _get("Grass")
+    if mat:
+        return mat
+    mat, nt, bsdf = _new("Grass")
+    coords = nt.nodes.new("ShaderNodeTexCoord")
+    coords.location = (-1200, 0)
+
+    def noise(scale, detail, rough, y):
+        n = nt.nodes.new("ShaderNodeTexNoise")
+        n.location = (-1000, y)
+        n.inputs["Scale"].default_value = scale
+        n.inputs["Detail"].default_value = detail
+        if "Roughness" in n.inputs:
+            n.inputs["Roughness"].default_value = rough
+        nt.links.new(coords.outputs["Object"], n.inputs["Vector"])
+        return n
+
+    fine = noise(38.0, 8.0, 0.7, 260)     # blade-scale mottle
+    patch = noise(2.2, 4.0, 0.55, 0)      # broad patches of growth
+    stripes = nt.nodes.new("ShaderNodeTexWave")
+    stripes.location = (-1000, -280)
+    stripes.inputs["Scale"].default_value = 0.42
+    stripes.inputs["Distortion"].default_value = 0.6
+    if "Detail" in stripes.inputs:
+        stripes.inputs["Detail"].default_value = 1.0
+    nt.links.new(coords.outputs["Object"], stripes.inputs["Vector"])
+
+    def mix(fac_node, c1, c2, y, fac_socket="Fac"):
+        m = nt.nodes.new("ShaderNodeMixRGB")
+        m.location = (-700, y)
+        m.inputs["Color1"].default_value = c1 if isinstance(c1, tuple) else hex_to_rgba(c1)
+        m.inputs["Color2"].default_value = c2 if isinstance(c2, tuple) else hex_to_rgba(c2)
+        nt.links.new(fac_node.outputs[fac_socket], m.inputs["Fac"])
+        return m
+
+    base = mix(fine, "#3F6B2E", "#5C8C3E", 260)          # blade to blade
+    patched = nt.nodes.new("ShaderNodeMixRGB")
+    patched.location = (-460, 120)
+    patched.inputs["Color2"].default_value = hex_to_rgba("#6E9243")
+    nt.links.new(patch.outputs["Fac"], patched.inputs["Fac"])
+    nt.links.new(base.outputs["Color"], patched.inputs["Color1"])
+    mown = nt.nodes.new("ShaderNodeMixRGB")
+    mown.location = (-240, 60)
+    mown.blend_type = "MULTIPLY"
+    mown.inputs["Fac"].default_value = 0.18                # subtle: a roller, not a football pitch
+    mown.inputs["Color2"].default_value = (0.78, 0.86, 0.72, 1.0)
+    nt.links.new(patched.outputs["Color"], mown.inputs["Color1"])
+    nt.links.new(stripes.outputs["Color"], mown.inputs["Color2"])
+    nt.links.new(mown.outputs["Color"], bsdf.inputs["Base Color"])
+
+    bump = nt.nodes.new("ShaderNodeBump")
+    bump.location = (-240, -260)
+    bump.inputs["Strength"].default_value = 0.35
+    bump.inputs["Distance"].default_value = 0.02
+    nt.links.new(fine.outputs["Fac"], bump.inputs["Height"])
+    nt.links.new(bump.outputs["Normal"], bsdf.inputs["Normal"])
+
+    _set(bsdf, "Roughness", 0.95)
+    _set(bsdf, "Specular IOR Level", 0.15)
+    return mat
 
 
 def lane_rope_material() -> bpy.types.Material:
@@ -346,7 +410,7 @@ def glass_material() -> bpy.types.Material:
     _set(bsdf, "Roughness", 0.18)
     _set(bsdf, "Transmission Weight", 0.0)
     _set(bsdf, "Specular IOR Level", 0.7)
-    _set(bsdf, "Alpha", 0.30)
+    _set(bsdf, "Alpha", 0.10)  # very thin: measured, a 22% white jug lifted the red behind it to (209,95,93)
     _blended(mat)
     return mat
 

@@ -39,8 +39,12 @@ LOGO_R = 0.42              # the spinning mark above and between the two labels
 LOGO_RAYS = 11             # a radiating burst; three blades read as a boat propeller
 LOGO_SPIN = 0.55           # radians per second
 LOGO_COLOR = "#D97757"
-SANGRIA = "#5E0618"        # very deep: the frosted glass in front lightens whatever is behind it
-SANGRIA_LOW = "#8A1A22"    # barely touched: a shade lighter, like a jug just poured
+SANGRIA = "#E00010"        # a saturated red, lit from within so it carries through the glass.
+# Tuned by measuring the rendered pixels, not by eye. The scene renders through AgX, which
+# desaturates bright emission: at 1.6 the fill came out (209,95,93), a coral. This, with a
+# thinner glass in front and a matte fill that throws no white specular, measures (214,80,73).
+# Biasing the red toward magenta to fight AgX's orange shift made it worse, not better.
+SANGRIA_LOW = "#FF2A08"    # barely touched: a shade warmer, like a jug just poured
 FRUIT = "#F0A030"
 
 WINDOWS = (("5 HOURS", "session"), ("THIS WEEK", "week"))
@@ -122,7 +126,7 @@ class Pitchers:
             jug = P.new_object(f"DP_Jug_{key}", _jug_mesh(glass))
             jug.location = (x + dx, y, TABLE_TOP_Z + 0.03)
             fill = P.new_object(f"DP_JugFill_{key}", _fill_mesh(
-                M.object_color_material("Sangria", roughness=0.12, emission=0.0, alpha_from_object=False)))
+                M.object_color_material("Sangria", roughness=0.45, emission=1.0, alpha_from_object=False)))
             fill.location = (x + dx, y, TABLE_TOP_Z + 0.045)
             fill.scale = (1.0, 1.0, 0.001)
             fruit = P.new_object(f"DP_JugFruit_{key}", MS.sphere_mesh(
