@@ -9,8 +9,10 @@ It reads at a glance from across a room, which a percentage on a board does not.
 """
 from __future__ import annotations
 
+import math
+
 import bpy
-from mathutils import Vector
+from mathutils import Matrix, Vector
 
 from ..theme import hex_to_rgba
 from . import materials as M
@@ -30,11 +32,15 @@ WALL = 0.016               # glass thickness, so the sangria sits inside the jug
 # distance, so a jug label and a lane sign are exactly the same size on screen.
 LABEL_DX = 1.36
 LABEL_DY = -0.22
-LABEL_Z = 2.20
+LABEL_Z = 1.95
 LABEL_REF_DIST = 15.2
 PLATE_W, PLATE_H = 1.78, 1.00
-SANGRIA = "#8E0A2C"        # deep: the frosted glass in front lightens whatever is behind it
-SANGRIA_LOW = "#C43A2E"    # barely touched: lighter, like a jug just poured
+LOGO_R = 0.42              # the spinning mark above and between the two labels
+LOGO_RAYS = 11             # a radiating burst; three blades read as a boat propeller
+LOGO_SPIN = 0.55           # radians per second
+LOGO_COLOR = "#D97757"
+SANGRIA = "#5E0618"        # very deep: the frosted glass in front lightens whatever is behind it
+SANGRIA_LOW = "#8A1A22"    # barely touched: a shade lighter, like a jug just poured
 FRUIT = "#F0A030"
 
 WINDOWS = (("5 HOURS", "session"), ("THIS WEEK", "week"))
@@ -59,6 +65,28 @@ def _fill_mesh(mat):
     b = MS._Builder()
     b.cylinder(JUG_R - WALL, 1.0, at=(0, 0, 0.5), segments=26)
     return b.finish("JugFill", [mat])
+
+
+def _logo_mesh(mat):
+    """A radiating burst, spun slowly over the two labels.
+
+    Drawn from primitives as a nod to the Claude starburst, not the official asset: Duck Pond
+    ships no brand files and cannot fetch one offline. Put a real image on a plane here if you
+    want the exact mark.
+    """
+    me = MS._existing("UsageLogo")
+    if me:
+        return me
+    b = MS._Builder()
+    for i in range(LOGO_RAYS):
+        a = 2 * math.pi * i / LOGO_RAYS
+        length = LOGO_R * (1.0 if i % 2 == 0 else 0.72)   # alternating, so it reads as a burst
+        b.cone(0.036, 0.004, length,
+               at=(length / 2 * math.cos(a), length / 2 * math.sin(a), 0.0),
+               rot=Matrix.Rotation(a, 4, "Z") @ Matrix.Rotation(math.radians(90), 4, "Y"),
+               segments=10)
+    b.sphere(0.055, scale=(1.0, 1.0, 0.45))
+    return b.finish("UsageLogo", [mat])
 
 
 def _table_mesh(mat):
@@ -108,8 +136,8 @@ class Pitchers:
             plate = P.new_object(f"DP_JugPlate_{key}",
                                  MS.plate_mesh("JugPlate", PLATE_W, PLATE_H, M.board_material()))
             plate.location = (0.0, PLATE_H / 2, -0.02)  # stands above the jugs
-            head = _text(f"DP_JugTitle_{key}", title, 0.27, M.text_material(), "CENTER")
-            head.location = (0.0, PLATE_H - 0.33, 0.0)
+            head = _text(f"DP_JugTitle_{key}", title, 0.20, M.text_material(), "CENTER")
+            head.location = (0.0, PLATE_H - 0.29, 0.0)
             pct = _text(f"DP_JugPct_{key}", "", 0.30,
                         M.flat_material("TextGold", "#F5C542", roughness=0.8, emission=1.4), "CENTER")
             pct.location = (0.0, PLATE_H - 0.66, 0.0)
@@ -122,6 +150,18 @@ class Pitchers:
                 o["dp_kind"] = "deck"
             self.objects[key] = {"jug": jug, "fill": fill, "fruit": fruit, "root": root,
                                  "head": head, "pct": pct, "sub": sub, "x": x + dx, "y": y}
+        # the mark sits between the two labels and above them, on its own screen-aligned root
+        logo_root = P.new_object("DP_UsageLogoRoot")
+        logo_root.location = (x, y + LABEL_DY, LABEL_Z + 2.10)  # clear of the plates above them
+        lc = logo_root.constraints.new("COPY_ROTATION")
+        lc.target = P.camera()
+        logo = P.new_object("DP_UsageLogo", _logo_mesh(
+            M.flat_material("UsageLogo", LOGO_COLOR, roughness=0.35, emission=0.9)))
+        logo.parent = logo_root
+        for o in (logo_root, logo):
+            o["dp_kind"] = "deck"
+        self.objects["logo_root"] = logo_root
+        self.objects["logo"] = logo
 
     def update(self, usage) -> None:
         """Pour each jug to its window's fraction and write the reset time under it."""
@@ -145,7 +185,7 @@ class Pitchers:
                 self.objects = {}
                 return
             pct = f"{int(round(frac * 100))}%" if usage.ok else "—"
-            sub = (f"resets {g.resets}" if g.resets else "") if usage.ok else "no reading"
+            sub = (g.resets or "") if usage.ok else "no reading"
             for slot, text in (("pct", pct), ("sub", sub)):
                 if self.last_text.get(key + slot) != text:
                     self.last_text[key + slot] = text
@@ -159,13 +199,28 @@ class Pitchers:
             eye = Vector(cam.location)
         except (AttributeError, ReferenceError):
             return
-        for _title, key in WINDOWS:
-            d = self.objects.get(key)
-            if not d:
-                continue
+        # one distance for both, measured at the table: scaling each label by its own distance
+        # left the nearer plate visibly larger than the far one
+        table = self.objects.get("table")
+        if table is None:
+            return
+        k = max(0.6, min(2.5, (Vector(table.location) - eye).length / LABEL_REF_DIST))
+        roots = [self.objects[key]["root"] for _t, key in WINDOWS if key in self.objects]
+        roots += [self.objects["logo_root"]] if "logo_root" in self.objects else []
+        for root in roots:
             try:
-                k = max(0.6, min(2.5, (Vector(d["root"].location) - eye).length / LABEL_REF_DIST))
-                if abs(d["root"].scale.x - k) > 1e-4:
-                    d["root"].scale = (k, k, k)
+                if abs(root.scale.x - k) > 1e-4:
+                    root.scale = (k, k, k)
             except ReferenceError:
                 return
+
+    def spin(self, now: float) -> None:
+        """Turn the mark. Its root copies the camera's rotation, so local Z faces the viewer
+        and spinning about it reads as a pinwheel rather than a sign edging away."""
+        logo = self.objects.get("logo")
+        if logo is None:
+            return
+        try:
+            logo.rotation_euler = (0.0, 0.0, (now * LOGO_SPIN) % (2 * math.pi))
+        except ReferenceError:
+            self.objects = {}

@@ -249,9 +249,16 @@ def tile_material(name: str = "Tile", color1: str = "#6FB7D6", color2: str = "#F
 
 
 def deck_material() -> bpy.types.Material:
-    """Warm clay, not the near-white it was: at #D8D2C4 the deck and the sky background were
-    within a few levels of each other and the pool had no edge to read against."""
-    return flat_material("Deck", "#A6603F", roughness=0.9)
+    """Dark grey paving, not the near-white it was: at #D8D2C4 the deck and the sky background
+    were within a few levels of each other and the pool had no edge to read against. Kept
+    lighter than the sangria table (#2B3444) so the table still stands on it rather than in it."""
+    return tile_material("DeckTile", "#41454B", "#5A6068", scale=1.1)
+
+
+def grass_material() -> bpy.types.Material:
+    """The lawn past the deck. Before it, the scene simply stopped at the paving and the world
+    background showed through as flat grey bands at the edges of a wide window."""
+    return flat_material("Grass", "#4C7A38", roughness=0.95)
 
 
 def lane_rope_material() -> bpy.types.Material:
@@ -339,7 +346,7 @@ def glass_material() -> bpy.types.Material:
     _set(bsdf, "Roughness", 0.18)
     _set(bsdf, "Transmission Weight", 0.0)
     _set(bsdf, "Specular IOR Level", 0.7)
-    _set(bsdf, "Alpha", 0.38)
+    _set(bsdf, "Alpha", 0.30)
     _blended(mat)
     return mat
 

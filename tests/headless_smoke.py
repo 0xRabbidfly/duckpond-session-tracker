@@ -113,7 +113,7 @@ _fw = obj("DP_JugFill_week").scale.z
 check(abs(_fs - _inner * 0.25) < 1e-6 and abs(_fw - _inner) < 1e-6,
       f"each jug is poured to its window ({_fs:.3f} and {_fw:.3f} of {_inner:.3f})")
 _week_label = obj("DP_JugSub_week").data.body
-check(_week_label == "resets Sep 26, 4pm", f"the reset time is written under the jug ({_week_label!r})")
+check(_week_label == "Sep 26, 4pm", f"the reset time is written under the jug ({_week_label!r})")
 RT.pitchers.update(Usage(ok=False, error="no CLI"))
 check(obj("DP_JugSub_session").data.body == "no reading", "a failed read says so rather than showing zero")
 check(len(RT.ripples.active_rings) > 0, "water has active ripple rings")

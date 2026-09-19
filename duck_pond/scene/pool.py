@@ -16,6 +16,7 @@ POOL_X = 16.0
 POOL_Y = 8.0
 DEPTH = 1.5
 DECK = 2.0
+GRASS_X, GRASS_Y = 90.0, 70.0  # the lawn: big enough to fill the frame at any window shape
 WATER_Z = 0.0
 MIN_LANE_W = 2.0
 LANE_MARGIN = 0.9
@@ -111,6 +112,11 @@ def ensure_pool() -> None:
     ):
         slab = new_object(name, MS.box_mesh(name[3:], sx, sy, 0.1, deck))
         slab.location = at
+
+    # the lawn runs well past the deck so a window wider than the render still lands on grass
+    grass = new_object("DP_Grass", MS.grid_mesh("Grass", GRASS_X, GRASS_Y, 1, 1, M.grass_material()))
+    grass.location = (POOL_X / 2 - GRASS_X / 2, POOL_Y / 2 - GRASS_Y / 2, -0.015)
+    grass["dp_kind"] = "deck"
 
     water = new_object("DP_Water", MS.grid_mesh("Water", POOL_X, POOL_Y, 64, 32, M.water_material()))
     water.location = (0, 0, WATER_Z)
