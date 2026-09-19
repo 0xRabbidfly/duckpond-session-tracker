@@ -116,8 +116,8 @@ RT.signs.last_update = 0.0
 RT.signs.update(RT.lanes, RT.fleet, t0 + _t, RT.redact)
 _portal = [(k, d) for k, d in RT.signs.objects.items() if "AI-HUB-Portal" in k]
 _usd = RT.fleet.ledger.cwd_month_usd(_portal[0][0], t0 + _t) if _portal else 0.0
-check(bool(_portal) and _usd > 0 and sum(1 for o in _portal[0][1]["coins"] if not o.hide_viewport) == min(24, int(_usd)),
-      f"AI-HUB-Portal lane shows its month spend as a coin stack (≈${_usd:.2f})")
+check(bool(_portal) and _usd > 0 and f"${_usd:.0f}" in _portal[0][1]["sub"].data.body,
+      f"AI-HUB-Portal lane sign shows its month spend ({_portal[0][1]['sub'].data.body if _portal else None})")
 check(RT.sky.chop >= 0.0 and RT.sky.night < 0.5 or RT.sky.clock_override is None, "sky is in a valid day state")
 
 # lane re-layout must not make ducks shake: headings may flip at most a couple of times

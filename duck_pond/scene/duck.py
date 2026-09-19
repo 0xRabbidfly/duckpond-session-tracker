@@ -123,7 +123,10 @@ class DuckObj:
         self.lifering = P.new_object(f"{name}_ring", MS.lifering_mesh(
             M.object_color_material("ContextRing", roughness=0.3, emission=0.25, alpha_from_object=False)))
         self.lifering.parent = self.obj
-        self.lifering.location = (0.16, 0.0, 0.12)
+        # At the neck, just under the head: down at 0.12 the body is wider than the ring, so the
+        # ring was buried in it and only the front edge showed. Up here only the back arc rests
+        # in the duck, which is where a ring worn over the head would sit anyway.
+        self.lifering.location = (0.20, 0.0, 0.225)
         self.lifering["dp_kind"] = "hat"  # hovering the ring hovers the duck
         self.lifering["dp_session_id"] = session_id
         self.lifering["dp_agent_id"] = agent_id

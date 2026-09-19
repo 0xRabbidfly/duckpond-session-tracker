@@ -12,19 +12,19 @@ from . import materials as M
 from . import meshes as MS
 from . import pool as P
 
-COINS_MAX = 24
-SIGN_W = 1.7  # lane sign plate, screen-aligned
-SIGN_H = 0.62
-SIGN_X = -1.15  # centre on the west deck, clear of the coin stack at the pool edge
+SIGN_W = 2.2  # lane sign plate, screen-aligned
+SIGN_H = 0.80
+SIGN_X = -1.05  # centre on the west deck (the deck runs from -2.0 to the pool lip at 0)
 # Signs are scaled by their distance to the camera so every lane's sign is the same size on
 # screen. Without it the far lane renders about a third smaller than the near one, which is
 # the difference between reading its branch and spend line and not.
-SIGN_REF_DIST = 17.4  # metres: the overview camera's distance to the middle of the sign row
+# The distance to the *nearest* sign, not the middle of the row: the near sign keeps the size
+# it always had -- it is the one with a frame edge and a coin stack to run into -- and the far
+# ones grow up to meet it. Scaling the whole row up instead pushed the near sign off-frame.
+SIGN_REF_DIST = 15.2
 SIGN_SCALE_RANGE = (0.6, 2.5)
-COIN_X = -0.12  # the coin stack stands at the pool edge, beside the sign
 SIGN_NAME_CHARS = 17
-SIGN_SUB_CHARS = 30
-COIN_USD = 1.0  # one coin per dollar
+SIGN_SUB_CHARS = 25  # fewer than before: the detail line is much bigger now
 
 
 def _text(name: str, body: str, size: float, mat, align="LEFT") -> bpy.types.Object:
@@ -42,8 +42,8 @@ def _set_body(obj, text: str) -> None:
 
 
 class LaneSigns:
-    """Per-lane decorations beyond the folder name: a branch line, a coin stack for spend, and
-    a small live strip of state colours (one dot per session in the lane)."""
+    """Per-lane decorations beyond the folder name: a branch line, the month's spend, and a
+    small live strip of state colours (one dot per session in the lane)."""
 
     def __init__(self) -> None:
         self.objects: dict[str, dict] = {}
@@ -52,7 +52,7 @@ class LaneSigns:
     def _ensure(self, key: str, i: int, y: float, w: float) -> dict:
         """One sign per lane, screen-aligned as a whole: the folder name on top, branch · sessions ·
         spend under it, one dot per live session at the bottom, all on one dark plate, so nothing
-        covers anything whichever way the camera looks. The coin stack stands on the deck beside it."""
+        covers anything whichever way the camera looks."""
         d = self.objects.get(key)
         if d and d["root"].name in bpy.data.objects:
             return d
@@ -62,15 +62,15 @@ class LaneSigns:
         c.target = P.camera()
         plate = P.new_object(f"DP_LanePlate_{i}", MS.plate_mesh("LaneSignPlate", SIGN_W, SIGN_H, M.board_material()))
         plate.location = (0.0, SIGN_H / 2, -0.02)
-        name = _text(f"DP_LaneName_{i}", "", 0.2, M.text_material(), "CENTER")
-        name.location = (0.0, SIGN_H - 0.25, 0.0)
-        sub = _text(f"DP_LaneSub_{i}", "", 0.12, M.flat_material("TextDim", "#B8C2D6", roughness=0.8, emission=0.8), "CENTER")
-        sub.location = (0.0, SIGN_H - 0.43, 0.0)
+        name = _text(f"DP_LaneName_{i}", "", 0.27, M.text_material(), "CENTER")
+        name.location = (0.0, SIGN_H - 0.33, 0.0)
+        sub = _text(f"DP_LaneSub_{i}", "", 0.185, M.flat_material("TextDim", "#B8C2D6", roughness=0.8, emission=0.8), "CENTER")
+        sub.location = (0.0, SIGN_H - 0.59, 0.0)
         dots = []
         dot_mat = M.object_color_material("Dot", roughness=0.4, emission=1.5, alpha_from_object=False)
         for j in range(6):
             o = P.new_object(f"DP_LaneDot_{i}_{j}", MS.sphere_mesh("Dot", 0.06, dot_mat))
-            o.location = (0.17 * (j - 2.5), 0.1, 0.0)
+            o.location = (0.20 * (j - 2.5), 0.12, 0.0)
             o.scale = (0.75, 0.75, 0.75)
             o.hide_viewport = True
             o.hide_render = True
@@ -79,16 +79,7 @@ class LaneSigns:
             o["dp_kind"] = "deck"
             if o is not root:
                 o.parent = root
-        coins = []
-        for j in range(COINS_MAX):
-            o = P.new_object(f"DP_Coin_{i}_{j}", MS.coin_mesh(M.coin_material()))
-            o.location = (COIN_X, y + 0.03 * (j % 2), 0.1 + 0.035 * j)
-            o.rotation_euler = (0.0, 0.0, 0.3 * j)
-            o.hide_viewport = True
-            o.hide_render = True
-            o["dp_kind"] = "deck"
-            coins.append(o)
-        d = {"root": root, "plate": plate, "name": name, "sub": sub, "dots": dots, "coins": coins, "y": y}
+        d = {"root": root, "plate": plate, "name": name, "sub": sub, "dots": dots, "y": y}
         self.objects[key] = d
         return d
 
@@ -129,10 +120,8 @@ class LaneSigns:
             y = i * w + w / 2
             d = self._ensure(key, i, y, w)
             live_keys.add(key)
-            if abs(d["y"] - y) > 1e-6:  # lane moved: move the sign (its parts follow) and the coins
-                dy = y - d["y"]
-                for o in [d["root"]] + d["coins"]:
-                    o.location.y += dy
+            if abs(d["y"] - y) > 1e-6:  # lane moved: the sign moves and its parts follow
+                d["root"].location.y = y
                 d["y"] = y
             sessions = [s for s in fleet.sessions.values() if (s.cwd or "(no cwd)") == key]
             live = [s for s in sessions if s.state != "ended"]
@@ -154,15 +143,9 @@ class LaneSigns:
                 else:
                     o.hide_viewport = True
                     o.hide_render = True
-            ncoins = min(COINS_MAX, int(cost / COIN_USD))
-            for j, o in enumerate(d["coins"]):
-                show = j < ncoins
-                if o.hide_viewport == show:
-                    o.hide_viewport = not show
-                    o.hide_render = not show
         for key in [k for k in self.objects if k not in live_keys]:
             d = self.objects.pop(key)
-            for o in [d["root"], d["plate"], d["name"], d["sub"]] + d["dots"] + d["coins"]:
+            for o in [d["root"], d["plate"], d["name"], d["sub"]] + d["dots"]:
                 try:
                     bpy.data.objects.remove(o, do_unlink=True)
                 except ReferenceError:
@@ -171,7 +154,7 @@ class LaneSigns:
     def clear(self) -> None:
         for key in list(self.objects):
             d = self.objects.pop(key)
-            for o in [d["root"], d["plate"], d["name"], d["sub"]] + d["dots"] + d["coins"]:
+            for o in [d["root"], d["plate"], d["name"], d["sub"]] + d["dots"]:
                 try:
                     bpy.data.objects.remove(o, do_unlink=True)
                 except ReferenceError:
