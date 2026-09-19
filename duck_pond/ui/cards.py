@@ -10,6 +10,7 @@ from __future__ import annotations
 import time
 from dataclasses import dataclass, field
 
+from ..ledger import RANGE_ORDER, RANGES, fmt_stats, fmt_usd
 from ..model import Fleet, Session, SubAgent
 from ..theme import HARNESS_LABELS, STATE_COLORS, hex_to_rgba, model_label, redact, tool_chip
 
@@ -238,6 +239,47 @@ def tag_for(fleet: Fleet, key: tuple[str, str], now: float, redact_on: bool) -> 
     else:
         status = STATE_LABELS.get(a.state, a.state)
     return name_for(fleet, key, redact_on), status, a.state
+
+
+@dataclass
+class Board:
+    """Everything the board says, with no idea how it is drawn.
+
+    Kept separate from the drawing so it can be asserted on outside Blender -- the board used
+    to be geometry, and the only way to test it was to read text off mesh objects.
+    """
+    status: list[tuple[str, str]] = field(default_factory=list)   # (text, state)
+    tabs: list[tuple[str, bool]] = field(default_factory=list)    # (name, selected)
+    range_line: str = ""
+    month_line: str = ""
+    foot: str = ""
+    bars: list[float] = field(default_factory=list)
+    peak: float = 0.0
+    scanning: bool = False
+
+
+def board_model(fleet: Fleet, now: float, board_range: str = "hour", extra: str = "") -> Board:
+    led = fleet.ledger
+    n, label, unit = RANGES[board_range]
+    b = Board(
+        status=status_segments(fleet, now),
+        tabs=[(name, name == board_range) for name in RANGE_ORDER],
+        scanning=not led.ready,
+    )
+    if led.ready:
+        b.range_line = f"{label}   {fmt_stats(led.range_stats(board_range, now))}"
+        b.month_line = f"{led.month_name(now)}   {fmt_stats(led.month_to_date(now))}"
+    else:
+        b.range_line = "scanning logs…"
+    b.bars = led.bars(board_range, now)
+    b.peak = max(b.bars) if b.bars else 0.0
+    foot = [time.strftime("%H:%M  %A %d %B", time.localtime(now))]
+    if b.peak > 0:
+        foot.insert(0, f"peak {fmt_usd(b.peak)}/{unit}")
+    if board_range in ("week", "month"):
+        foot.append("logs keep ~30 days")
+    b.foot = extra or "  ·  ".join(foot)
+    return b
 
 
 def status_segments(fleet: Fleet, now: float) -> list[tuple[str, str]]:

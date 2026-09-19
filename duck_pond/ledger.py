@@ -26,6 +26,25 @@ RANGES = {
 }
 RANGE_ORDER = ("min", "hour", "day", "week", "month")
 
+def fmt_usd(v: float) -> str:
+    return f"≈${v:,.0f}" if v >= 1000 else f"≈${v:.2f}"
+
+
+def fmt_tokens(n: int) -> str:
+    n = int(n)
+    if n >= 1_000_000:
+        return f"{n / 1_000_000:.1f}M"
+    if n >= 1000:
+        return f"{n / 1000:.0f}k"
+    return str(n)
+
+
+def fmt_stats(st) -> str:
+    """One ledger Stats as a board line. `+?` = tokens from models with no list price."""
+    return (f"{fmt_usd(st.usd)}{' +?' if st.unpriced else ''}  ·  {fmt_tokens(st.tokens_out)} out tok  ·  "
+            f"{st.sessions} session{'' if st.sessions == 1 else 's'}")
+
+
 _TOKEN_FIELDS = ("tokens_in", "cache_write_5m", "cache_write_1h", "cache_read", "tokens_out")
 
 

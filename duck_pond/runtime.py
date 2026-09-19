@@ -20,7 +20,7 @@ from .adapters.base import Adapter
 from .ledger import RANGE_ORDER
 from .model import Fleet
 from .scene import pool as P
-from .scene.deck import LaneSigns, Scoreboard
+from .scene.deck import LaneSigns
 from .scene.duck import DuckObj
 from .scene.fx import FX
 from .scene.props import PoolProps
@@ -55,7 +55,6 @@ class Runtime:
         self.motion = Motion()
         self.fx = FX()
         self.motion.fx = self.fx
-        self.board = Scoreboard()
         self.signs = LaneSigns()
         self.sky = Sky()
         self.props = PoolProps()
@@ -100,7 +99,6 @@ class Runtime:
         self.fx.ensure_pools()
         self.sky.ensure()
         self.props.ensure()
-        self.board.ensure()
         self.packets.redact_enabled = self.redact
         self.running = True
         self.paused = False
@@ -147,7 +145,6 @@ class Runtime:
         self.motion = Motion()
         self.fx = FX()
         self.motion.fx = self.fx
-        self.board = Scoreboard()
         self.signs = LaneSigns()
         self.sky = Sky()
         self.props = PoolProps()
@@ -285,7 +282,6 @@ class Runtime:
             self._remove_key(key)
         # the world and the deck
         self.sky.tick(self.fleet, now)
-        self.board.update(self.fleet, now, self.board_range)
         self.signs.update(self.lanes, self.fleet, now, self.redact)
 
     def _duck_pos(self, key: Key):
@@ -439,7 +435,6 @@ class Runtime:
     def set_board_range(self, name: str) -> None:
         if name in RANGE_ORDER and name != self.board_range:
             self.board_range = name
-            self.board.last_update = 0.0  # redraw on the next tick, not a second later
 
     def next_board_range(self) -> str:
         return RANGE_ORDER[(RANGE_ORDER.index(self.board_range) + 1) % len(RANGE_ORDER)]

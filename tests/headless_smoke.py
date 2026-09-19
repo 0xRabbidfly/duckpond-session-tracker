@@ -14,6 +14,7 @@ sys.path.insert(0, ROOT)
 import duck_pond  # noqa: E402
 from duck_pond.adapters.stub import StubAdapter  # noqa: E402
 from duck_pond.runtime import RT  # noqa: E402
+from duck_pond.ui import cards  # noqa: E402
 
 OUT = os.path.join(ROOT, "out")
 os.makedirs(OUT, exist_ok=True)
@@ -93,19 +94,20 @@ check(obj("DP_Duck_vscode-4").rotation_euler.y > 0.1, "tool-running duck dips it
 check(not obj("DP_Duck_cc-opus-2_beacon").hide_viewport and obj("DP_Duck_cc-opus-2_beacon").color[0] > 0.8 and obj("DP_Duck_cc-opus-2_beacon").color[2] < 0.2,
       "waiting duck's lamp is yellow")
 check(RT.fleet.sessions["cc-fable-1"].effort == "max", "effort is read from the fixture")
-check(obj("DP_Board") is not None and "WORKING" in obj("DP_Board_L1").data.body, f"scoreboard reads: {obj('DP_Board_L1').data.body}")
+# the board is a screen overlay now, so it is asserted through its model, not its objects
+check(obj("DP_Board") is None and obj("DP_Board_L1") is None, "no scoreboard geometry is left in the scene")
 check(RT.fleet.ledger.ready, "the ledger backfill finished")
-check(all(obj(f"DP_Board_Tab_{r}") is not None for r in ("min", "hour", "day", "week", "month")), "scoreboard has the five range tabs")
-check(sum(1 for b in RT.board.bars if not b.hide_viewport) == 24 and any(b.scale.z > 0.05 for b in RT.board.bars),
-      "hour range: 24 bars with a live one")
-check(obj("DP_Board_L2").data.body.startswith("last 24 h") and "≈$" in obj("DP_Board_L2").data.body, f"range line: {obj('DP_Board_L2').data.body}")
-check("≈$" in obj("DP_Board_L3").data.body, f"month line: {obj('DP_Board_L3').data.body}")
+_b = cards.board_model(RT.fleet, t0 + _t, RT.board_range)
+check(any("WORKING" in t for t, _s in _b.status), f"board reads: {_b.status}")
+check([n for n, _sel in _b.tabs] == ["min", "hour", "day", "week", "month"], "board has the five range tabs")
+check([n for n, sel in _b.tabs if sel] == ["hour"], f"the picked range is the selected tab ({_b.tabs})")
+check(len(_b.bars) == 24 and _b.peak > 0, f"hour range: 24 bars with a live one (peak {_b.peak:.2f})")
+check(_b.range_line.startswith("last 24 h") and "≈$" in _b.range_line, f"range line: {_b.range_line}")
+check("≈$" in _b.month_line, f"month line: {_b.month_line}")
 RT.set_board_range("min")
-RT.board.update(RT.fleet, t0 + _t, RT.board_range)
-check(sum(1 for b in RT.board.bars if not b.hide_viewport) == 60 and obj("DP_Board_L2").data.body.startswith("last 60 min"),
-      f"min range: 60 bars ({obj('DP_Board_L2').data.body})")
-check(obj("DP_Board_TabLine_min") is not None and not obj("DP_Board_TabLine_min").hide_viewport and obj("DP_Board_TabLine_hour").hide_viewport,
-      "the selected tab is underlined")
+_b = cards.board_model(RT.fleet, t0 + _t, RT.board_range)
+check(len(_b.bars) == 60 and _b.range_line.startswith("last 60 min"), f"min range: 60 bars ({_b.range_line})")
+check([n for n, sel in _b.tabs if sel] == ["min"], "switching the range moves the selected tab")
 RT.set_board_range("hour")
 check(any(not o.hide_viewport for o in RT.fx.chips), "a tool chip is on screen (bash / edit / read…)")
 check(RT.fx.active_orbs or any(not o.hide_viewport for o in RT.fx.orbs), "thought bubbles / drops / risers are pooled and visible")

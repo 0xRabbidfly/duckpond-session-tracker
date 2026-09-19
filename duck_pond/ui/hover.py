@@ -37,7 +37,18 @@ FONT = 0
 PAD = 12
 LINE_H = 18
 TITLE_SIZE = 20
-STATUS_SIZE = 31    # the pool status, centred along the top: the biggest text on screen
+STATUS_SIZE = 31    # the pool status, top row of the board: the biggest text on screen
+TAB_SIZE = 16
+LINE_SIZE = 20
+FOOT_SIZE = 14
+TAB_H = 26
+TAB_PAD = 14
+TAB_GAP = 8
+BAR_H = 34
+BOARD_PAD = 14
+BOARD_BG = (0.04, 0.05, 0.08, 0.80)
+GOLD = (1.0, 0.77, 0.26, 0.95)
+TEAL = (0.37, 0.92, 0.83, 0.9)
 TAG_SIZE = 19       # big enough to read across a room, small enough not to own the frame
 TAG_SIZE_SMALL = 12
 TAG_BG = (0.04, 0.05, 0.08, 0.52)  # see-through: a tag sits over water and ducks, not beside them
@@ -59,6 +70,8 @@ class DUCKPOND_OT_hover(bpy.types.Operator):
     _handle = None
     _last_cast = 0.0
     _hit = None  # the object under the last cast (original, not evaluated)
+    _tab_rects = ()  # range-tab hit boxes, refreshed every time the board is drawn
+    _board_rect = None
 
     def invoke(self, context, event):
         if context.area is None or context.area.type != "VIEW_3D":
@@ -88,13 +101,19 @@ class DUCKPOND_OT_hover(bpy.types.Operator):
                 self._cast(context, event)
             return {"PASS_THROUGH"}
         if event.type == "LEFTMOUSE" and event.value == "PRESS" and self._over_pool(context, event):
-            # cast where the click landed: a swimming duck has usually left the last hover cast behind.
-            # A range tab on the scoreboard switches the range and leaves the pin alone. A duck,
-            # duckling or tether pins its card and tag; anywhere else in the pool releases it.
+            # The board is drawn on top of the pool, so it gets the click first: a range tab
+            # switches the range and leaves the pin alone, and a click anywhere else on the
+            # board is swallowed rather than unpinning the duck you were reading about.
+            tab = self._board_tab_at(context.region, event.mouse_region_x, event.mouse_region_y)
+            if tab:
+                context.window_manager.duck_pond.board_range = tab
+                context.area.tag_redraw()
+                return {"RUNNING_MODAL"}
+            if self._over_board(context.region, event.mouse_region_x, event.mouse_region_y):
+                return {"RUNNING_MODAL"}
+            # cast where the click landed: a swimming duck has usually left the last hover cast
+            # behind. A duck, duckling or tether pins its card and tag; anywhere else releases it.
             self._cast(context, event)
-            if self._hit is not None and self._hit.get("dp_kind") == "range_tab":
-                context.window_manager.duck_pond.board_range = self._hit["dp_range"]
-                return {"PASS_THROUGH"}
             RT.pinned = RT.hover
             context.area.tag_redraw()
             return {"PASS_THROUGH"}
@@ -204,7 +223,7 @@ class DUCKPOND_OT_hover(bpy.types.Operator):
         self._draw_card(context, region, card, footer, key)
         if RT.show_legend:
             self._draw_legend(context, region)
-        self._draw_status(region, now)  # last: the one thing that must never be covered
+        self._draw_board(region, now)  # last: the one thing that must never be covered
         if RT.last_error:
             blf.size(FONT, 13)
             blf.color(FONT, 1.0, 0.4, 0.4, 1.0)
@@ -387,38 +406,118 @@ class DUCKPOND_OT_hover(bpy.types.Operator):
         blf.draw(FONT, status)
         blf.size(FONT, 13)
 
-    def _draw_status(self, region, now: float) -> None:
-        """Who is doing what, top-left, one colour per state.
+    def _draw_board(self, region, now: float) -> None:
+        """The whole board, drawn across the top of the screen.
 
-        This used to be the top row of the 3D scoreboard, where a duck's name tag would park on
-        it and hide it for minutes. Drawn here it is in screen space, centred along the top and
-        last of everything, so it is the one readout in the pool that nothing can cover.
+        It used to be geometry standing on the north deck, where duck name tags parked on top of
+        it and the far half was read at an angle. In screen space it is flat, square-on, always
+        the same size, and drawn last of everything, so nothing can cover it. The range tabs stay
+        clickable: their rectangles are recorded here and hit-tested on the next click.
         """
-        segs = cards.status_segments(RT.fleet, now)
+        b = cards.board_model(RT.fleet, now, RT.board_range)
+        pad = BOARD_PAD
+
         blf.size(FONT, STATUS_SIZE)
         sep = "  ·  "
-        sep_w = blf.dimensions(FONT, sep)[0]
-        widths = [blf.dimensions(FONT, text)[0] for text, _st in segs]
-        total = sum(widths) + sep_w * (len(segs) - 1)
-        h = blf.dimensions(FONT, "M")[1]
-        w = total + 2 * PAD + 16
-        x0 = max(12, (region.width - w) / 2)
-        y1 = region.height - 18
-        y0 = y1 - h - 2 * PAD
-        self._rect(x0, y0, x0 + w, y1, (0.04, 0.05, 0.08, 0.72))
-        x = x0 + PAD + 8
-        for i, ((text, state), sw) in enumerate(zip(segs, widths)):
+        st_sep_w = blf.dimensions(FONT, sep)[0]
+        st_w = [blf.dimensions(FONT, t)[0] for t, _s in b.status]
+        status_w = sum(st_w) + st_sep_w * (len(b.status) - 1)
+        status_h = blf.dimensions(FONT, "M")[1]
+
+        blf.size(FONT, TAB_SIZE)
+        tab_w = [blf.dimensions(FONT, n)[0] + 2 * TAB_PAD for n, _sel in b.tabs]
+        tabs_w = sum(tab_w) + TAB_GAP * (len(b.tabs) - 1)
+
+        blf.size(FONT, LINE_SIZE)
+        lines_w = max(blf.dimensions(FONT, t)[0] for t in (b.range_line, b.month_line or " "))
+        blf.size(FONT, FOOT_SIZE)
+        foot_w = blf.dimensions(FONT, b.foot)[0]
+
+        inner = max(status_w, tabs_w, lines_w, foot_w, 420)
+        width = min(inner + 2 * pad, region.width - 32)
+        inner = width - 2 * pad
+        height = pad + status_h + 12 + TAB_H + 10 + 2 * (LINE_SIZE + 8) + BAR_H + 10 + FOOT_SIZE + 6 + pad
+        x0 = (region.width - width) / 2
+        y1 = region.height - 14
+        y0 = y1 - height
+        self._rect(x0, y0, x0 + width, y1, BOARD_BG)
+        self._board_rect = (x0, y0, x0 + width, y1)
+        cx = x0 + width / 2
+
+        # row 1: who is doing what, one colour per state
+        blf.size(FONT, STATUS_SIZE)
+        y = y1 - pad - status_h
+        x = cx - status_w / 2
+        for i, ((text, state), w) in enumerate(zip(b.status, st_w)):
             c = cards.state_rgba(state)
             blf.color(FONT, min(1.0, c[0] * 1.5 + 0.25), min(1.0, c[1] * 1.5 + 0.25), min(1.0, c[2] * 1.5 + 0.25), 1.0)
-            blf.position(FONT, x, y0 + PAD, 0)
+            blf.position(FONT, x, y, 0)
             blf.draw(FONT, text)
-            x += sw
-            if i < len(segs) - 1:
+            x += w
+            if i < len(b.status) - 1:
                 blf.color(FONT, 0.5, 0.55, 0.62, 1.0)
-                blf.position(FONT, x, y0 + PAD, 0)
+                blf.position(FONT, x, y, 0)
                 blf.draw(FONT, sep)
-                x += sep_w
+                x += st_sep_w
+
+        # row 2: range tabs, recorded for the click handler
+        y -= 12 + TAB_H
+        x = cx - tabs_w / 2
+        self._tab_rects = []
+        blf.size(FONT, TAB_SIZE)
+        for (name, sel), w in zip(b.tabs, tab_w):
+            self._rect(x, y, x + w, y + TAB_H, (0.12, 0.15, 0.22, 0.95) if sel else (0.09, 0.11, 0.16, 0.8))
+            if sel:
+                self._rect(x, y, x + w, y + 2, GOLD)
+            blf.color(FONT, *((1.0, 0.85, 0.35, 1.0) if sel else (0.66, 0.71, 0.80, 1.0)))
+            blf.position(FONT, x + TAB_PAD, y + 7, 0)
+            blf.draw(FONT, name)
+            self._tab_rects.append((x, y, x + w, y + TAB_H, name))
+            x += w + TAB_GAP
+
+        # rows 3-4: spend for the picked range, then the month so far
+        blf.size(FONT, LINE_SIZE)
+        y -= 10 + LINE_SIZE + 4
+        blf.color(FONT, 1.0, 0.85, 0.35, 1.0)
+        blf.position(FONT, cx - blf.dimensions(FONT, b.range_line)[0] / 2, y, 0)
+        blf.draw(FONT, b.range_line)
+        if b.month_line:
+            y -= LINE_SIZE + 8
+            blf.color(FONT, 0.93, 0.94, 0.96, 1.0)
+            blf.position(FONT, cx - blf.dimensions(FONT, b.month_line)[0] / 2, y, 0)
+            blf.draw(FONT, b.month_line)
+        else:
+            y -= LINE_SIZE + 8
+
+        # the sparkline: one bar per bucket, the current one in gold
+        y -= 8 + BAR_H
+        if b.bars:
+            n = len(b.bars)
+            slot = inner / n
+            bw = max(2.0, slot * 0.68)
+            for i, v in enumerate(b.bars):
+                bh = max(1.0, BAR_H * v / b.peak) if b.peak > 0 else 1.0
+                bx = x0 + pad + slot * (i + 0.5) - bw / 2
+                self._rect(bx, y, bx + bw, y + bh, GOLD if i == n - 1 else TEAL)
+
+        # the footer: peak and the clock
+        blf.size(FONT, FOOT_SIZE)
+        y -= 6 + FOOT_SIZE
+        blf.color(FONT, 0.55, 0.78, 0.74, 1.0)
+        blf.position(FONT, cx - foot_w / 2, y, 0)
+        blf.draw(FONT, b.foot)
         blf.size(FONT, 13)
+
+    def _over_board(self, region, mx: int, my: int) -> bool:
+        r = getattr(self, "_board_rect", None)
+        return bool(r) and r[0] <= mx <= r[2] and r[1] <= my <= r[3]
+
+    def _board_tab_at(self, region, mx: int, my: int) -> str | None:
+        """The range tab under a click in region coordinates, or None."""
+        for x0, y0, x1, y1, name in getattr(self, "_tab_rects", ()):
+            if x0 <= mx <= x1 and y0 <= my <= y1:
+                return name
+        return None
 
     # ------------------------------------------------------------ legend
     def _draw_legend(self, context, region) -> None:
