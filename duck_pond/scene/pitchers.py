@@ -20,7 +20,10 @@ from . import meshes as MS
 from . import pool as P
 from .deck import _text
 
-TABLE_AT = (15.15, 9.35)   # the outer corner of the north-east deck, well back from the water
+# Further in than the deck's outer corner. The kiosk window is wider than the one
+# dev/gui_shot.py opens, so it frames the pool differently: at 15.15 the right-hand label
+# was fully visible in a screenshot and clipped by the window edge in the real app.
+TABLE_AT = (11.80, 9.35)
 TABLE_R = 1.15
 TABLE_TOP_Z = 0.92
 JUG_DX = 0.58              # the two jugs either side of the table's centre
@@ -30,7 +33,7 @@ WALL = 0.016               # glass thickness, so the sangria sits inside the jug
 # pool. They are wider apart than the jugs and overhang the table, because they are signage
 # rather than furniture -- and they are scaled to the camera at the lane signs' own reference
 # distance, so a jug label and a lane sign are exactly the same size on screen.
-LABEL_DX = 1.36
+LABEL_DX = 1.24
 LABEL_DY = -0.22
 LABEL_Z = 1.95
 LABEL_REF_DIST = 15.2
