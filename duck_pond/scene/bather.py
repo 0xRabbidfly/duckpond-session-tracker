@@ -60,6 +60,19 @@ HEAD_YAW = math.radians(26)
 HEAD_UP = math.radians(30)
 SWAY_HZ = 0.06
 
+# Her right arm is its own object so it can be raised. Built pointing straight up from the
+# shoulder, which makes both poses easy to state: REST swings it down and back to the deck,
+# WAVE brings it up and out. Blending the X angle between them sweeps through "straight
+# forward", which is the arc an arm actually takes.
+ARM_SHOULDER = (0.145, 0.03, 0.655)
+ARM_REST = (math.radians(-159), math.radians(14), 0.0)
+ARM_WAVE = (math.radians(-18), math.radians(30), 0.0)
+WAVE_SWING = math.radians(17)   # how far the raised hand swings either side
+WAVE_HZ = 0.85
+WAVE_EASE = 1.8                 # how fast the arm goes up and comes down, per second.
+# Measured: at 2.6 the arm moved 11 deg in a frame at 30 fps, which is a flick rather
+# than a raise. At 1.8 the worst frame is about 8 deg and it still reads as prompt.
+
 SH, AC, JT, VI = 0, 1, 2, 3  # material slots
 
 
@@ -97,16 +110,33 @@ def _body_mesh(shell, accent, joint, visor):
     b.sphere(1.0, at=(0, 0.025, 0.56), scale=(0.175, 0.13, 0.195), slot=SH)   # chest shell
     b.sphere(1.0, at=(0, -0.055, 0.575), scale=(0.115, 0.09, 0.115), slot=AC) # chest plate
     b.cylinder(0.052, 0.075, at=(0, 0.02, 0.715), slot=JT, segments=14)       # neck
-    for sx in (1, -1):
-        shoulder = (sx * 0.145, 0.03, 0.655)
-        elbow = (sx * 0.205, 0.165, 0.38)
-        hand = (sx * 0.225, 0.255, 0.07)
-        b.sphere(0.058, at=shoulder, slot=JT)
-        _limb(b, shoulder, elbow, 0.048, 0.040, slot=SH)
-        b.sphere(0.042, at=elbow, slot=JT)
-        _limb(b, elbow, hand, 0.040, 0.033, slot=SH)
-        b.sphere(0.048, at=hand, scale=(1.0, 1.25, 0.65), slot=AC)            # palm on the deck
+    # her left arm stays propped on the deck and is part of the body; the right one is a
+    # separate object so it can be raised, and only its shoulder ball is built here
+    b.sphere(0.058, at=ARM_SHOULDER, slot=JT)
+    sx = -1
+    shoulder = (sx * 0.145, 0.03, 0.655)
+    elbow = (sx * 0.205, 0.165, 0.38)
+    hand = (sx * 0.225, 0.255, 0.07)
+    b.sphere(0.058, at=shoulder, slot=JT)
+    _limb(b, shoulder, elbow, 0.048, 0.040, slot=SH)
+    b.sphere(0.042, at=elbow, slot=JT)
+    _limb(b, elbow, hand, 0.040, 0.033, slot=SH)
+    b.sphere(0.048, at=hand, scale=(1.0, 1.25, 0.65), slot=AC)                # palm on the deck
     return b.finish("Bather", [shell, accent, joint, visor])
+
+
+def _arm_mesh(shell, accent, joint):
+    """Her right arm, origin at the shoulder, built pointing straight up."""
+    me = MS._existing("BatherArm")
+    if me:
+        return me
+    b = MS._Builder()
+    elbow, hand = (0.018, 0.0, 0.275), (0.048, -0.022, 0.555)
+    _limb(b, (0.0, 0.0, 0.0), elbow, 0.048, 0.040, slot=SH)
+    b.sphere(0.042, at=elbow, slot=JT)
+    _limb(b, elbow, hand, 0.040, 0.033, slot=SH)
+    b.sphere(0.049, at=hand, scale=(1.0, 0.72, 1.15), slot=AC)                # the hand itself
+    return b.finish("BatherArm", [shell, accent, joint])
 
 
 def _head_mesh(shell, accent, joint, visor):
@@ -143,8 +173,10 @@ class Bather:
     def __init__(self) -> None:
         self.body = None
         self.head = None
+        self.arm = None
         self.legs: list = []
         self._last_ring = 0.0
+        self._wave = 0.0     # 0 propped on the deck, 1 arm up; eased, never snapped
 
     def ensure(self) -> None:
         if self.body is not None and self.body.name in bpy.data.objects:
@@ -163,6 +195,11 @@ class Bather:
         self.head.parent = self.body
         self.head.location = NECK
         self.head["dp_kind"] = "deck"
+        self.arm = P.new_object("DP_BatherArm", _arm_mesh(shell, accent, joint))
+        self.arm.parent = self.body
+        self.arm.location = ARM_SHOULDER
+        self.arm.rotation_euler = ARM_REST
+        self.arm["dp_kind"] = "deck"
         self.legs = []
         for i, hip in enumerate(HIPS):
             leg = P.new_object(f"DP_BatherLeg{i}", _leg_mesh(shell, accent, joint))
@@ -171,10 +208,19 @@ class Bather:
             leg["dp_kind"] = "deck"
             self.legs.append(leg)
 
-    def update(self, now: float, ripples=None) -> None:
+    def update(self, now: float, dt: float = 0.0, ripples=None, waving: bool = False) -> None:
+        """`waving` is set when at least one duck is waiting on you. She puts her hand up.
+
+        The flag is a step function -- a duck finishes a turn and it flips -- so the arm eases
+        toward it rather than following it, and she stops sunbathing while her hand is up: you
+        cannot lean back on an arm you are waving with.
+        """
         if self.body is None:
             return
-        lean = _envelope(now)
+        target = 1.0 if waving else 0.0
+        self._wave += (target - self._wave) * min(1.0, max(0.0, dt) * WAVE_EASE)
+        wave = self._wave
+        lean = _envelope(now) * (1.0 - wave)
         try:
             # back on her hands during the lean; the rest of the time she just sways
             self.body.rotation_euler = (
@@ -188,13 +234,20 @@ class Bather:
                 0.0,
                 HEAD_YAW * lean * math.sin(now * 2 * math.pi * HEAD_HZ),
             )
-            # feet waving, livelier when she is stretched out
-            amp = KICK * (1.0 + 0.7 * lean)
+            # the arm: down on the deck, or up and swinging
+            self.arm.rotation_euler = (
+                ARM_REST[0] + (ARM_WAVE[0] - ARM_REST[0]) * wave,
+                ARM_REST[1] + (ARM_WAVE[1] - ARM_REST[1]) * wave
+                + WAVE_SWING * wave * math.sin(now * 2 * math.pi * WAVE_HZ),
+                0.0,
+            )
+            # feet waving, livelier when she is stretched out or when she wants your attention
+            amp = KICK * (1.0 + 0.7 * lean + 0.5 * wave)
             for i, leg in enumerate(self.legs):
                 phase = now * 2 * math.pi * KICK_HZ * (1.0 + 0.5 * lean) + i * math.pi * 0.7
                 leg.rotation_euler = (amp * math.sin(phase), 0.0, 0.0)
         except ReferenceError:
-            self.body = self.head = None
+            self.body = self.head = self.arm = None
             self.legs = []
             return
         # a small ring at her feet, so the water knows she is there

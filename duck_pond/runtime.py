@@ -85,6 +85,7 @@ class Runtime:
         self.status = "stopped"
         self.last_error = ""
         self.hover_started = False
+        self.waiting_on_you = False  # any duck waiting for you: the bather waves
         self.poll_interval = POLL_INTERVAL
         self.idle_after = IDLE_AFTER_S
         self.end_after = END_AFTER_S
@@ -234,8 +235,10 @@ class Runtime:
         self.sync(now)
 
     def sync(self, now: float) -> None:
+        live = self.fleet.live_sessions()
+        self.waiting_on_you = any(s.state in ("awaiting_user", "awaiting_permission") for s in live)
         # lanes follow the set of live working directories
-        cwds = [s.cwd or "(no cwd)" for s in self.fleet.live_sessions()]
+        cwds = [s.cwd or "(no cwd)" for s in live]
         self.lanes.update(cwds, now)
         # ducks for sessions
         for s in self.fleet.sessions.values():
@@ -396,7 +399,7 @@ class Runtime:
         self.fx.update(dt)
         self.sky.update(now, dt)
         self.props.update(now, dt)  # the pool toys drift whatever else is happening
-        self.bather.update(now, self.ripples)
+        self.bather.update(now, dt, self.ripples, self.waiting_on_you)
         self.pitchers.scale_to_camera(cam)
         self.pitchers.spin(now)
         self.signs.scale_to_camera(cam)  # every lane sign the same size on screen

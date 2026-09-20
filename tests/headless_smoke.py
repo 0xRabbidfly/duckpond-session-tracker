@@ -103,6 +103,22 @@ check(_near_bill > 0.15, f"the ring clears the bill by {_near_bill:.3f} (level a
 check(min(p.z for p in _pts) < 0.0 < max(p.z for p in _pts),
       f"it slopes from above the neck into the water (z {min(p.z for p in _pts):+.3f}..{max(p.z for p in _pts):+.3f})")
 check(_th > 0.3, f"and it is tilted, not level ({math.degrees(_th):.0f} deg)")
+# the bather waves when a duck is waiting on you
+_waiting = [s for s in RT.fleet.live_sessions() if s.state in ("awaiting_user", "awaiting_permission")]
+check(bool(_waiting) == RT.waiting_on_you,
+      f"waiting_on_you tracks the fleet ({RT.waiting_on_you}, {[s.id for s in _waiting]})")
+# settle her arm down first: the fixture already has a duck waiting, so by now it is up
+for _i in range(150):
+    RT.bather.update(t0 + _t + _i / 30.0, 1 / 30.0, None, False)
+_rest = obj("DP_BatherArm").rotation_euler.x
+for _i in range(150):
+    RT.bather.update(t0 + _t + 5 + _i / 30.0, 1 / 30.0, None, True)
+_up = obj("DP_BatherArm").rotation_euler.x
+check(_up > _rest + 1.0,
+      f"her arm comes up when someone is waiting ({math.degrees(_rest):.0f} to {math.degrees(_up):.0f} deg)")
+for _i in range(200):
+    RT.bather.update(t0 + _t + 10 + _i / 30.0, 1 / 30.0, None, False)
+check(abs(obj("DP_BatherArm").rotation_euler.x - _rest) < 0.02, "and goes back down when nobody is")
 # the sangria jugs: filled from the usage limits, which a test must never go and fetch
 check(not RT.limits._thread, "a headless run never starts the usage-limit reader")
 RT.limits.set_snapshot(Usage(session=Gauge(0.25, "8:30pm"), week=Gauge(1.0, "Sep 26, 4pm"), ok=True))
