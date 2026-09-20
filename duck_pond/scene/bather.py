@@ -1,13 +1,21 @@
-"""Someone sitting on the edge with her feet in the water.
+"""An android sitting on the edge with her feet in the water.
 
-Built from the same primitives as the ducks, so she is stylised and low-poly rather than a
-figure: a person-shaped silhouette at pool scale, read at a glance from across a room. She
-carries no data and means nothing, like the floating toys. She is there so the pool looks
-occupied rather than like a chart with a duck on it.
+A robot rather than a person on purpose. Duck Pond builds everything from primitives, and a
+robot *is* primitives: shells, seams and visible joints read honestly at this poly count,
+where a human reads as a mannequin. She also keeps her animation, which a downloaded mesh
+would not -- an unrigged import can only sit there.
 
-She idles continuously (a slow sway, feet waving in the water) and every so often leans back
-on her hands, tips her face up to the sun and swings her head slowly side to side. Nothing in
-this scene is allowed to be a statue, and a motion that only ever loops is nearly one.
+(Free CC0 model libraries do exist: Quaternius, Kenney, KayKit, indexed on npm by
+`@jgengine/assets`. None of them was usable here. The providers' CDNs are blocked by the
+network filter on this machine; the only robot reachable on GitHub ships under a Poser EULA,
+which cannot go into an MIT repo; and the CC0 packs that are reachable are environment kits,
+fantasy humans and skeletons. Drop a `.glb` in and it can be imported instead.)
+
+She carries no data and means nothing, like the floating toys. She is there so the pool looks
+occupied rather than like a chart with a duck on it. She idles continuously -- a slow sway,
+feet waving in the water -- and every so often leans back on her hands, tips her face up to
+the sun and swings her head slowly side to side. Nothing here is allowed to be a statue, and
+a motion that only ever loops is nearly one.
 """
 from __future__ import annotations
 
@@ -20,23 +28,22 @@ from . import materials as M
 from . import meshes as MS
 from . import pool as P
 
-# The north deck slab starts at y = 8.1; at 8.02 she was sitting on the water, not the deck,
+# The north deck slab starts at y = 8.1; further forward she sat on the water, not the deck,
 # and her thighs vanished into the pool edge so her feet read as two loose lumps.
 AT = (1.70, 8.18)
 # Everything on this deck is built oversized so it reads from across a room: a sangria jug is
 # 0.58 m tall here against about 0.28 m in life. Built at life scale she stood barely twice a
-# jug's height next to them, where a real person is over three times one. SCALE puts her back
-# in proportion with the furniture rather than with the metre.
+# jug's height next to them, where a real person is over three times one.
 SCALE = 1.75
 HIP_BOTTOM = 0.15            # local z of her underside, so she can be sat on the deck slab
 DECK_TOP = 0.10
-# Her face, sunglasses and knees are all built on -Y, so zero already points her down the
-# pool at the camera. The 180 degrees she had turned her back on the room.
+# Her visor and knees are built on -Y, so zero already points her down the pool at the camera.
 FACING = 0.0
-SKIN = "#C98B63"
-SUIT = "#F4F1EA"
-HAIR = "#3A2A22"
-GLASS = "#14161A"
+
+SHELL = "#E9EBEF"            # the panels: off-white ceramic
+ACCENT = "#C08552"           # rose gold, a hue no signal in this scene uses
+JOINT = "#2E3238"            # the dark rubber at every articulation
+VISOR = "#14161A"            # her sunglasses, which on an android is a visor
 
 NECK = (0.0, 0.02, 0.74)     # where the head pivots, in her local space (-Y is forward)
 HIPS = ((0.108, -0.01, 0.28), (-0.108, -0.01, 0.28))
@@ -53,6 +60,8 @@ HEAD_YAW = math.radians(26)
 HEAD_UP = math.radians(30)
 SWAY_HZ = 0.06
 
+SH, AC, JT, VI = 0, 1, 2, 3  # material slots
+
 
 def _envelope(now: float) -> float:
     """0 to 1 and back: how far into the lean she is, rising and falling smoothly."""
@@ -68,61 +77,66 @@ def _envelope(now: float) -> float:
     return 0.5 - 0.5 * math.cos(math.pi * max(0.0, min(1.0, k)))
 
 
-def _limb(b, p0, p1, r0, r1, slot=0, segments=10):
+def _limb(b, p0, p1, r0, r1, slot=SH, segments=12):
     """A tapered segment from p0 to p1. Placing limbs by joint rather than by eye is the whole
     point: hand-placed cones and spheres did not meet the body and she came apart."""
     a, c = Vector(p0), Vector(p1)
     d = c - a
-    rot = d.to_track_quat("Z", "Y").to_matrix().to_4x4()
-    b.cone(r0, r1, d.length, at=tuple((a + c) / 2), rot=rot, slot=slot, segments=segments)
+    b.cone(r0, r1, d.length, at=tuple((a + c) / 2),
+           rot=d.to_track_quat("Z", "Y").to_matrix().to_4x4(), slot=slot, segments=segments)
 
 
-def _body_mesh(skin, suit):
+def _body_mesh(shell, accent, joint, visor):
     me = MS._existing("Bather")
     if me:
         return me
     b = MS._Builder()
-    b.sphere(1.0, at=(0, 0.02, 0.28), scale=(0.21, 0.17, 0.155), slot=1)     # hips, swimsuit
-    b.sphere(1.0, at=(0, 0.025, 0.55), scale=(0.175, 0.13, 0.20), slot=0)    # torso, skin
-    b.sphere(1.0, at=(0, 0.02, 0.63), scale=(0.181, 0.137, 0.065), slot=1)   # swimsuit top
-    b.sphere(1.0, at=(0, 0.02, 0.40), scale=(0.155, 0.125, 0.13), slot=0)    # waist, joins the two
+    b.sphere(1.0, at=(0, 0.02, 0.28), scale=(0.205, 0.165, 0.150), slot=SH)   # hip shell
+    b.sphere(1.0, at=(0, 0.02, 0.255), scale=(0.212, 0.172, 0.055), slot=AC)  # hip band
+    b.cylinder(0.105, 0.10, at=(0, 0.02, 0.40), slot=JT, segments=16)         # waist joint
+    b.sphere(1.0, at=(0, 0.025, 0.56), scale=(0.175, 0.13, 0.195), slot=SH)   # chest shell
+    b.sphere(1.0, at=(0, -0.055, 0.575), scale=(0.115, 0.09, 0.115), slot=AC) # chest plate
+    b.cylinder(0.052, 0.075, at=(0, 0.02, 0.715), slot=JT, segments=14)       # neck
     for sx in (1, -1):
-        shoulder = (sx * 0.145, 0.03, 0.67)
+        shoulder = (sx * 0.145, 0.03, 0.655)
         elbow = (sx * 0.205, 0.165, 0.38)
         hand = (sx * 0.225, 0.255, 0.07)
-        b.sphere(0.056, at=shoulder, slot=0)
-        _limb(b, shoulder, elbow, 0.048, 0.040)                              # upper arm, back
-        _limb(b, elbow, hand, 0.040, 0.034)                                  # forearm, to the deck
-        b.sphere(0.05, at=hand, scale=(1.0, 1.25, 0.65), slot=0)             # hand flat on the deck
-    return b.finish("Bather", [skin, suit])
+        b.sphere(0.058, at=shoulder, slot=JT)
+        _limb(b, shoulder, elbow, 0.048, 0.040, slot=SH)
+        b.sphere(0.042, at=elbow, slot=JT)
+        _limb(b, elbow, hand, 0.040, 0.033, slot=SH)
+        b.sphere(0.048, at=hand, scale=(1.0, 1.25, 0.65), slot=AC)            # palm on the deck
+    return b.finish("Bather", [shell, accent, joint, visor])
 
 
-def _head_mesh(skin, hair, glass):
-    """Head, hair and sunglasses, with the origin at the neck so it can turn and tip."""
+def _head_mesh(shell, accent, joint, visor):
+    """Head and visor, with the origin at the neck so it can turn and tip."""
     me = MS._existing("BatherHead")
     if me:
         return me
     b = MS._Builder()
-    b.sphere(0.125, at=(0, 0.0, 0.13), slot=0)
-    b.sphere(0.142, at=(0, 0.045, 0.155), scale=(1.0, 1.0, 0.92), slot=1)    # hair
-    b.sphere(0.10, at=(0, 0.10, 0.00), scale=(1.0, 0.7, 1.4), slot=1)        # hair down the back
-    b.box(0.215, 0.035, 0.055, at=(0, -0.105, 0.145), slot=2)                # sunglasses
-    return b.finish("BatherHead", [skin, hair, glass])
+    b.sphere(1.0, at=(0, 0.0, 0.13), scale=(0.118, 0.125, 0.135), slot=SH)    # skull
+    b.sphere(1.0, at=(0, 0.052, 0.155), scale=(0.132, 0.118, 0.128), slot=AC) # swept crest
+    b.sphere(1.0, at=(0, 0.105, 0.02), scale=(0.075, 0.055, 0.115), slot=AC)  # nape, down the back
+    b.sphere(1.0, at=(0, -0.055, 0.128), scale=(0.112, 0.085, 0.048), slot=VI)  # wraparound visor
+    b.cylinder(0.031, 0.026, at=(0, 0.0, 0.03), slot=JT, segments=12)         # neck collar
+    return b.finish("BatherHead", [shell, accent, joint, visor])
 
 
-def _leg_mesh(skin):
+def _leg_mesh(shell, accent, joint):
     """One leg, with the origin at the hip so the object can swing from it."""
     me = MS._existing("BatherLeg")
     if me:
         return me
     b = MS._Builder()
     hip, knee, ankle = (0.0, 0.0, 0.0), (0.0, -0.235, -0.115), (0.0, -0.275, -0.60)
-    b.sphere(0.062, at=hip, slot=0)                                          # fills the hip socket
-    _limb(b, hip, knee, 0.060, 0.048)                                        # thigh, out over the edge
-    b.sphere(0.049, at=knee, slot=0)                                         # knee
-    _limb(b, knee, ankle, 0.046, 0.036)                                      # shin, down into the water
-    b.sphere(0.048, at=(0.0, -0.315, -0.625), scale=(0.85, 1.5, 0.6), slot=0)   # foot
-    return b.finish("BatherLeg", [skin])
+    b.sphere(0.064, at=hip, slot=JT)                                          # hip ball
+    _limb(b, hip, knee, 0.060, 0.048, slot=SH)                                # thigh
+    b.sphere(0.050, at=knee, slot=JT)                                         # knee
+    _limb(b, knee, ankle, 0.046, 0.036, slot=SH)                              # shin
+    b.sphere(0.038, at=ankle, slot=JT)                                        # ankle
+    b.sphere(0.046, at=(0.0, -0.315, -0.625), scale=(0.85, 1.5, 0.6), slot=AC)  # foot
+    return b.finish("BatherLeg", [shell, accent, joint])
 
 
 class Bather:
@@ -135,23 +149,23 @@ class Bather:
     def ensure(self) -> None:
         if self.body is not None and self.body.name in bpy.data.objects:
             return
-        skin = M.flat_material("Skin", SKIN, roughness=0.65)
-        suit = M.flat_material("Swimsuit", SUIT, roughness=0.5)
-        hair = M.flat_material("Hair", HAIR, roughness=0.4)
-        glass = M.flat_material("Sunglasses", GLASS, roughness=0.12)
+        shell = M.flat_material("Shell", SHELL, roughness=0.28)
+        accent = M.flat_material("Accent", ACCENT, roughness=0.32)
+        joint = M.flat_material("Joint", JOINT, roughness=0.6)
+        visor = M.flat_material("Visor", VISOR, roughness=0.08)
         x, y = AT
-        self.body = P.new_object("DP_Bather", _body_mesh(skin, suit))
+        self.body = P.new_object("DP_Bather", _body_mesh(shell, accent, joint, visor))
         self.body.location = (x, y, DECK_TOP - HIP_BOTTOM * SCALE)
         self.body.scale = (SCALE, SCALE, SCALE)
         self.body.rotation_euler = (0.0, 0.0, FACING)
         self.body["dp_kind"] = "deck"
-        self.head = P.new_object("DP_BatherHead", _head_mesh(skin, hair, glass))
+        self.head = P.new_object("DP_BatherHead", _head_mesh(shell, accent, joint, visor))
         self.head.parent = self.body
         self.head.location = NECK
         self.head["dp_kind"] = "deck"
         self.legs = []
         for i, hip in enumerate(HIPS):
-            leg = P.new_object(f"DP_BatherLeg{i}", _leg_mesh(skin))
+            leg = P.new_object(f"DP_BatherLeg{i}", _leg_mesh(shell, accent, joint))
             leg.parent = self.body
             leg.location = hip
             leg["dp_kind"] = "deck"
