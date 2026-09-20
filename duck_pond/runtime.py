@@ -20,6 +20,7 @@ from .adapters.base import Adapter
 from .ledger import RANGE_ORDER
 from .model import Fleet
 from .scene import pool as P
+from .scene.bather import Bather
 from .scene.deck import LaneSigns
 from .scene.duck import DuckObj
 from .scene.fx import FX
@@ -61,6 +62,7 @@ class Runtime:
         self.sky = Sky()
         self.props = PoolProps()
         self.pitchers = Pitchers()
+        self.bather = Bather()
         self.director = Director()
         self.limits = UsageLimits()  # the sangria jugs: your 5-hour and 7-day windows
         self.sound = None  # set by the addon when enabled (sound.Sound)
@@ -104,6 +106,7 @@ class Runtime:
         self.sky.ensure()
         self.props.ensure()
         self.pitchers.ensure()
+        self.bather.ensure()
         self.packets.redact_enabled = self.redact
         self.running = True
         self.paused = False
@@ -157,6 +160,7 @@ class Runtime:
         self.sky = Sky()
         self.props = PoolProps()
         self.pitchers = Pitchers()
+        self.bather = Bather()
         self.director = Director()
         self.fleet = Fleet()
         coll = bpy.data.collections.get(P.COLL_NAME)
@@ -392,6 +396,7 @@ class Runtime:
         self.fx.update(dt)
         self.sky.update(now, dt)
         self.props.update(now, dt)  # the pool toys drift whatever else is happening
+        self.bather.update(now, self.ripples)
         self.pitchers.scale_to_camera(cam)
         self.pitchers.spin(now)
         self.signs.scale_to_camera(cam)  # every lane sign the same size on screen
