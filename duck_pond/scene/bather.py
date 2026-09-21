@@ -209,11 +209,12 @@ class Bather:
             self.legs.append(leg)
 
     def update(self, now: float, dt: float = 0.0, ripples=None, waving: bool = False) -> None:
-        """`waving` is set when at least one duck is waiting on you. She puts her hand up.
+        """`waving` is set when a duck has asked you a question. She puts her hand up.
 
-        The flag is a step function -- a duck finishes a turn and it flips -- so the arm eases
-        toward it rather than following it, and she stops sunbathing while her hand is up: you
-        cannot lean back on an arm you are waving with.
+        A question, not a finished turn: a turn ending is merely your turn next, and waving at
+        every one of those would make the signal worthless. The flag is a step function, so the
+        arm eases toward it rather than following it, and she stops sunbathing while her hand
+        is up: you cannot lean back on an arm you are waving with.
         """
         if self.body is None:
             return

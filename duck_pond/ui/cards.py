@@ -69,7 +69,7 @@ class Card:
 def _state_text(agent, now: float) -> str:
     conf = "" if agent.state_confidence == "exact" else " (inferred)"
     label = STATE_LABELS.get(agent.state, agent.state)
-    if agent.state == "awaiting_user" and now - agent.state_since > 600 and not agent.question:
+    if agent.waiting_quietly(now):
         label = "waiting for you (quiet)"
     return f"{label}{conf} · {fmt_elapsed(now - agent.state_since)}"
 
@@ -233,7 +233,7 @@ def tag_for(fleet: Fleet, key: tuple[str, str], now: float, redact_on: bool) -> 
     elif a.state == "generating":
         status = "thinking" if a.thinking else "writing"
     elif a.state == "awaiting_user":
-        status = "asking you" if a.question else ("waiting" if now - a.state_since > 600 else "your turn")
+        status = "asking you" if a.question else ("waiting" if a.waiting_quietly(now) else "your turn")
     elif a.state == "awaiting_permission":
         status = "needs permission"
     else:

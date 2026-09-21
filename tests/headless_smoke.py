@@ -16,6 +16,7 @@ sys.path.insert(0, ROOT)
 import duck_pond  # noqa: E402
 from duck_pond.adapters.stub import StubAdapter  # noqa: E402
 from duck_pond.runtime import RT  # noqa: E402
+from duck_pond.scene import props as props_mod  # noqa: E402
 from duck_pond.scene.pitchers import JUG_H, WALL  # noqa: E402
 from duck_pond.ui import cards  # noqa: E402
 from duck_pond.usage_limits import Gauge, Usage  # noqa: E402
@@ -103,11 +104,18 @@ check(_near_bill > 0.15, f"the ring clears the bill by {_near_bill:.3f} (level a
 check(min(p.z for p in _pts) < 0.0 < max(p.z for p in _pts),
       f"it slopes from above the neck into the water (z {min(p.z for p in _pts):+.3f}..{max(p.z for p in _pts):+.3f})")
 check(_th > 0.3, f"and it is tilted, not level ({math.degrees(_th):.0f} deg)")
-# the bather waves when a duck is waiting on you
-_waiting = [s for s in RT.fleet.live_sessions() if s.state in ("awaiting_user", "awaiting_permission")]
-check(bool(_waiting) == RT.waiting_on_you,
-      f"waiting_on_you tracks the fleet ({RT.waiting_on_you}, {[s.id for s in _waiting]})")
-# settle her arm down first: the fixture already has a duck waiting, so by now it is up
+# the bather waves when a duck has put a question to you, not when a turn merely ended
+_asking = [s for s in RT.fleet.live_sessions() if s.blocked_on_you()]
+check(bool(_asking) == RT.blocked_on_you,
+      f"blocked_on_you tracks the fleet ({RT.blocked_on_you}, {[s.id for s in _asking]})")
+_turn_only = [s for s in RT.fleet.live_sessions() if s.state == "awaiting_user" and not s.question]
+check(not any(s.blocked_on_you() for s in _turn_only),
+      f"a finished turn does not block you, so it does not wave ({[s.id for s in _turn_only]})")
+_q = RT.fleet.sessions["cc-opus-2"]
+_saved_q, _q.question = _q.question, "Which one?"
+check(_q.blocked_on_you(), "a pending question counts as blocked on you")
+_q.question = _saved_q
+# settle her arm down first: the fixture may already have her hand up
 for _i in range(150):
     RT.bather.update(t0 + _t + _i / 30.0, 1 / 30.0, None, False)
 _rest = obj("DP_BatherArm").rotation_euler.x
@@ -115,10 +123,33 @@ for _i in range(150):
     RT.bather.update(t0 + _t + 5 + _i / 30.0, 1 / 30.0, None, True)
 _up = obj("DP_BatherArm").rotation_euler.x
 check(_up > _rest + 1.0,
-      f"her arm comes up when someone is waiting ({math.degrees(_rest):.0f} to {math.degrees(_up):.0f} deg)")
+      f"her arm comes up when someone asks you something ({math.degrees(_rest):.0f} to {math.degrees(_up):.0f} deg)")
 for _i in range(200):
     RT.bather.update(t0 + _t + 10 + _i / 30.0, 1 / 30.0, None, False)
-check(abs(obj("DP_BatherArm").rotation_euler.x - _rest) < 0.02, "and goes back down when nobody is")
+check(abs(obj("DP_BatherArm").rotation_euler.x - _rest) < 0.02, "and goes back down once you have answered")
+# the noodles roam the pool and push out of whatever they meet
+_nd = RT.props.noodles
+check(len(_nd) >= 2, f"there are noodles to collide ({len(_nd)})")
+class _D:
+    def __init__(self, x, y):
+        self.x, self.y = x, y
+_nd[0].update(x=4.0, y=4.0, heading=0.0, vx=0.0, vy=0.0, spin=0.0)
+_nd[1].update(x=4.05, y=4.03, heading=1.4, vx=0.0, vy=0.0, spin=0.0)   # crossed, the usual case
+for _i in range(90):
+    RT.props.update(t0 + _t + _i / 30.0, 1 / 30.0, {})
+_a1, _b1 = props_mod._seg(_nd[0])
+_a2, _b2 = props_mod._seg(_nd[1])
+_gap = props_mod._closest_between(_a1, _b1, _a2, _b2)[0]
+check(_gap > 2 * props_mod.NOODLE_R - 0.02, f"two noodles laid on top of each other push apart ({_gap:.2f} m)")
+_nd[0].update(x=8.0, y=4.0, heading=0.0, vx=0.0, vy=0.0, spin=0.0)
+for _i in range(40):
+    RT.props.update(t0 + _t + 2 + _i / 30.0, 1 / 30.0, {"d": _D(8.0, 4.0)})
+_c, _ = props_mod._closest_on_seg(*props_mod._seg(_nd[0]), (8.0, 4.0))
+_dd = math.dist(_c, (8.0, 4.0))
+check(_dd > props_mod.NOODLE_R + props_mod.DUCK_R - 0.02, f"a noodle dropped on a duck is pushed off it ({_dd:.2f} m)")
+for _n in _nd:
+    for _e in props_mod._seg(_n):
+        check(0 <= _e[0] <= 16.0 and 0 <= _e[1] <= 8.0, f"a noodle end stays in the pool ({_e[0]:.1f},{_e[1]:.1f})")
 # the sangria jugs: filled from the usage limits, which a test must never go and fetch
 check(not RT.limits._thread, "a headless run never starts the usage-limit reader")
 RT.limits.set_snapshot(Usage(session=Gauge(0.25, "8:30pm"), week=Gauge(1.0, "Sep 26, 4pm"), ok=True))

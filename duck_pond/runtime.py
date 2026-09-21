@@ -85,7 +85,7 @@ class Runtime:
         self.status = "stopped"
         self.last_error = ""
         self.hover_started = False
-        self.waiting_on_you = False  # any duck waiting for you: the bather waves
+        self.blocked_on_you = False  # a duck is stopped until you act: the bather waves
         self.poll_interval = POLL_INTERVAL
         self.idle_after = IDLE_AFTER_S
         self.end_after = END_AFTER_S
@@ -236,7 +236,10 @@ class Runtime:
 
     def sync(self, now: float) -> None:
         live = self.fleet.live_sessions()
-        self.waiting_on_you = any(s.state in ("awaiting_user", "awaiting_permission") for s in live)
+        # only where the agent is stopped until you act -- a question put to you, or a
+        # permission prompt. A finished turn is merely your turn next, and waving at
+        # every one of those would make the signal worthless.
+        self.blocked_on_you = any(s.blocked_on_you() for s in live)
         # lanes follow the set of live working directories
         cwds = [s.cwd or "(no cwd)" for s in live]
         self.lanes.update(cwds, now)
@@ -398,8 +401,8 @@ class Runtime:
         self.ripples.update(dt)
         self.fx.update(dt)
         self.sky.update(now, dt)
-        self.props.update(now, dt)  # the pool toys drift whatever else is happening
-        self.bather.update(now, dt, self.ripples, self.waiting_on_you)
+        self.props.update(now, dt, self.motion.states)  # toys drift; noodles bump into things
+        self.bather.update(now, dt, self.ripples, self.blocked_on_you)
         self.pitchers.scale_to_camera(cam)
         self.pitchers.spin(now)
         self.signs.scale_to_camera(cam)  # every lane sign the same size on screen

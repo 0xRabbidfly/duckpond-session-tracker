@@ -10,6 +10,10 @@ from .ledger import UsageLedger
 from .theme import tool_category
 
 STATES = ("generating", "tool_running", "awaiting_user", "awaiting_permission", "idle", "ended", "error")
+# An awaited turn older than this has gone quiet. The screen tag calls it "waiting" from here
+# on, where a turn that has just finished says "your turn"; the bather waves at the first and
+# not the second, so the rule lives here rather than being spelled twice.
+QUIET_AFTER_S = 600.0
 
 DEFAULT_CONTEXT_WINDOW = 200_000
 BIG_CONTEXT_WINDOW = 1_000_000
@@ -117,6 +121,24 @@ class Agent:
         if not self.context_window:
             return 0.0
         return max(0.0, min(1.0, self.context_used / self.context_window))
+
+    def blocked_on_you(self) -> bool:
+        """Stopped dead until you act: a question put to you, or a permission prompt.
+
+        Not the same as a finished turn, which is merely your turn next and gets answered
+        when you feel like it. Both of these have the agent sitting idle at your expense.
+        """
+        return self.state == "awaiting_permission" or (
+            bool(self.question) and self.state == "awaiting_user")
+
+    def waiting_quietly(self, now: float) -> bool:
+        """Waiting on you long enough to have been forgotten about.
+
+        Not a pending question (that has its own, louder signal) and not a turn that has just
+        ended: those two are answered within a minute or two and are not worth flagging.
+        """
+        return (self.state == "awaiting_user" and not self.question
+                and now - self.state_since > QUIET_AFTER_S)
 
     def set_state(self, state: str, at: float, confidence: str = "inferred") -> bool:
         if state not in STATES:

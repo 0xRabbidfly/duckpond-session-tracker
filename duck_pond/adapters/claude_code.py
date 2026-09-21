@@ -170,7 +170,14 @@ class _TranscriptParser:
             elif stop == "end_turn":
                 ev.append({"type": "StateChanged", "state": "awaiting_user", **base})
             elif stop == "tool_use" or any(b.get("type") == "tool_use" for b in (content or []) if isinstance(b, dict)):
-                ev.append({"type": "StateChanged", "state": "tool_running", **base})
+                # An AskUserQuestion is not the agent running a tool, it is the agent stopped
+                # dead until you answer. The reducer already sets awaiting_user and keeps the
+                # question text off the ToolCall; emitting tool_running here overwrote both,
+                # so a real question showed as a running tool and then, twelve seconds later,
+                # as an inferred permission block with its text thrown away.
+                if not any(isinstance(b, dict) and b.get("type") == "tool_use"
+                           and b.get("name") == "AskUserQuestion" for b in (content or [])):
+                    ev.append({"type": "StateChanged", "state": "tool_running", **base})
             elif stop is None:
                 ev.append({"type": "StateChanged", "state": "generating", **base})
 
