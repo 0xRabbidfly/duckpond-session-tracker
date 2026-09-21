@@ -413,7 +413,7 @@ class Runtime:
         self.props.update(now, dt, self.motion.states)  # toys drift; noodles bump into things
         self.bather.update(now, dt, self.ripples, self.blocked_on_you)
         self.pitchers.scale_to_camera(cam)
-        self.pitchers.pulse(now)
+        self.pitchers.pulse(now, self.sky.night)
         self.plane.update(now, dt, self.versions.snapshot())
         self.signs.scale_to_camera(cam)  # every lane sign the same size on screen
         if self.director.enabled and self.motion.follow is None:

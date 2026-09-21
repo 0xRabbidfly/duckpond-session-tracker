@@ -25,7 +25,7 @@ from .deck import _set_body, _text
 
 LANE_Y = 20.0
 LANE_Z = 0.62            # centred in the sky band; at 1.05 it grazed the top edge
-X0, X1 = -13.0, 36.0     # off the left edge to off the right; the banner trails 10 units back
+X0, X1 = -13.0, 40.0     # off the left edge to off the right; the rig is 11 units long
 SPEED = 3.2              # units per second: about fifteen seconds to cross
 EVERY_S = 150.0          # one flypast every two and a half minutes
 BOB = 0.11               # a little air under it, so it is not on rails
@@ -35,13 +35,16 @@ PROP_SPIN = 22.0         # radians per second; fast enough to blur into a disc
 BODY = "#E8E4DC"         # cream, so it holds up against both a pale sky and a black one
 TRIM = "#C2462F"
 DARK = "#252A33"
-ROPE_LEN = 1.10
+# A long tow line, so the plane and its banner are rarely behind the board at the top
+# of the screen at the same moment: while one is covered the other is usually clear.
+ROPE_LEN = 3.30
 # The plate is built one unit wide and stretched to whatever the rows turn out to be. A
 # version string is not a fixed width -- 2.1.9 and 2.1.278 differ, and the second row grows
 # a whole word when you are behind -- and a banner whose text runs off the end of it is worse
 # than no banner. Measured once per text change, which is once every few hours.
 BANNER_UNIT = 1.0
 BANNER_H = 2.0
+BANNER_SCALE = 0.75      # a quarter off: less of the thin sky band, less to clip
 BANNER_PAD = 0.45
 ROW_SIZE = 0.60
 BA, BB = 0, 1            # material slots: body, trim
@@ -99,6 +102,9 @@ class BannerPlane:
         # None, not False: the first _show must actually run. Left at False it no-ops,
         # and the plane sits parked and visible at the start of the runway.
         self._flying: bool | None = None
+        # shifts the flypast clock. A screenshot wants the plane in shot, not wherever
+        # the two-and-a-half-minute cycle happens to have left it.
+        self.phase = 0.0
 
     def ensure(self) -> None:
         if self.objects and self.objects["root"].name in bpy.data.objects:
@@ -125,6 +131,7 @@ class BannerPlane:
         banner = P.new_object("DP_PlaneBanner")
         banner.parent = root
         banner.rotation_euler = (math.radians(90), 0.0, 0.0)
+        banner.scale = (BANNER_SCALE, BANNER_SCALE, BANNER_SCALE)
         plate = P.new_object("DP_PlaneBannerPlate",
                              MS.plate_mesh("BannerPlate", BANNER_UNIT, BANNER_H, M.board_material()))
         plate.parent = banner
@@ -152,11 +159,15 @@ class BannerPlane:
         """
         try:
             bpy.context.view_layer.update()
-            w = max(self.objects["top"].dimensions.x, self.objects["bottom"].dimensions.x)
-            w = max(w + 2 * BANNER_PAD, 3.0)
+            # `dimensions` is in world units -- it carries the parent's scale -- while the
+            # plate's scale is in the banner's own space. Divide back out, or the banner
+            # shrinks by BANNER_SCALE twice and comes out narrower than its own text.
+            rows = max(self.objects["top"].dimensions.x, self.objects["bottom"].dimensions.x)
+            w = max(rows / BANNER_SCALE + 2 * BANNER_PAD, 3.0)
             self.objects["plate"].scale = (w / BANNER_UNIT, 1.0, 1.0)
-            # the front edge stays on the rope; the banner grows backwards from there
-            self.objects["banner"].location = (-1.0 - ROPE_LEN - w / 2, 0.0, 0.0)
+            # the front edge stays on the rope; the banner grows backwards from there.
+            # `w` is in the banner's own space, which the scale shrinks before it lands.
+            self.objects["banner"].location = (-1.0 - ROPE_LEN - w * BANNER_SCALE / 2, 0.0, 0.0)
         except (ReferenceError, KeyError, AttributeError):
             pass
 
@@ -175,7 +186,7 @@ class BannerPlane:
             self._show(False)      # no reading: no banner. Two question marks help nobody
             return
         cross = (X1 - X0) / SPEED
-        t = now % EVERY_S
+        t = (now + self.phase) % EVERY_S
         if t > cross:
             self._show(False)
             return
@@ -196,7 +207,9 @@ class BannerPlane:
             root = self.objects["root"]
             root.location = (X0 + SPEED * t, LANE_Y,
                              LANE_Z + BOB * math.sin(now * 2 * math.pi * BOB_HZ))
-            root.rotation_euler = (math.radians(2.5) * math.sin(now * 2 * math.pi * BOB_HZ),
+            # a gentle pitch only: more than this and the banner reads as skewed rather
+            # than flying, because it is a flat sign seen at an angle already
+            root.rotation_euler = (math.radians(1.5) * math.sin(now * 2 * math.pi * BOB_HZ),
                                    0.0, 0.0)
             self.objects["prop"].rotation_euler = (now * PROP_SPIN % (2 * math.pi), 0.0, 0.0)
         except ReferenceError:

@@ -37,6 +37,7 @@ AT = float(arg("--at", "9"))
 PIN = arg("--pin", None)
 KIOSK = "--kiosk" in args
 CLOCK = arg("--clock", None)
+PLANE = arg("--plane", None)   # 0..1: park the banner that far into its crossing
 
 duck_pond.register()
 props = bpy.context.window_manager.duck_pond
@@ -107,6 +108,10 @@ def _fit():
 def _shoot():
     if time.time() - T_START < AT + 1.0:
         return 0.25
+    if PLANE is not None:
+        from duck_pond.scene import plane as plane_mod
+        cross = (plane_mod.X1 - plane_mod.X0) / plane_mod.SPEED
+        RT.plane.phase = cross * float(PLANE) - time.time()
     if PIN:
         RT.pinned = (PIN, "")
         RT.hover = RT.pinned
@@ -114,6 +119,9 @@ def _shoot():
         for a in bpy.context.screen.areas:
             a.tag_redraw()
         bpy.app.timers.register(_save, first_interval=0.6)
+        return None
+    if PLANE is not None:
+        bpy.app.timers.register(_save, first_interval=0.5)  # let a frame fly it there
         return None
     return _save()
 

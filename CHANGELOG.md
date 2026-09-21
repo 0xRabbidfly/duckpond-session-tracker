@@ -57,14 +57,18 @@ All notable changes to Duck Pond are recorded here. The format follows
   far on a fixed line, and ≈$ bars for the range with their peak.
 
 ### Changed
+- The banner plane's tow line is three times longer and its banner a quarter smaller. The
+  board across the top of the screen covers the whole sky band in the middle of the frame,
+  so a short rig vanished behind it whole; a long one keeps the banner clear while the
+  plane is behind, and the other way round.
 - The two usage plates and everything written on them are 30% smaller, and sit closer
   together.
 - The Claude mark above them no longer turns. Its arms reach out and draw back in, in a
   wave running round the burst, which is what the mark does when it is thinking -- and a
   pulse survives being small, where a slow rotation just looks like a wobble. Each arm is
-  its own object now, so its length is its scale. It also sits on a dark disc: it floats
-  against a sky that is pale by day and black by night, and no single colour contrasts with
-  both, so the disc fixes the background instead.
+  its own object now, so its length is its scale. It is a deep clay that goes unlit by day,
+  reading as a dark shape against a bright sky, and lights from within at night, reading as
+  a glowing one against a dark sky: one colour, both skies, no plate behind it.
 - The pool-wide totals no longer sit in the bottom-left corner. They are on the board at the
   top of the screen already, and a second copy under the hover card only ever got read as
   belonging to the duck the card was about. What is left there is `PAUSED`, `REDACTION OFF`

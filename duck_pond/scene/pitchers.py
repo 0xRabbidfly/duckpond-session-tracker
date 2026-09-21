@@ -47,11 +47,13 @@ LOGO_RAYS = 11             # a radiating burst
 # where a slow rotation just looks like a wobble.
 LOGO_PULSE_HZ = 0.42       # one wave round the burst every two and a half seconds
 LOGO_MIN, LOGO_MAX = 0.42, 1.12   # how far in and out a ray travels, as a fraction of LOGO_R
-LOGO_COLOR = "#E88A66"     # a touch brighter than the clay, to lift off the disc
-LOGO_DISC = "#1A1008"      # it floats against the sky, which is pale by day and black by
-# night, so nothing painted on it alone can contrast with both. A dark disc behind it fixes
-# the background instead, and the mark is then legible at noon and at midnight.
-LOGO_DISC_R = 0.53         # wider than LOGO_R * LOGO_MAX, so a ray never pokes outside
+# The mark floats against the sky, which is pale at noon and near black at midnight, so no
+# one appearance can carry both. A deep clay reads as a dark shape against a bright sky; the
+# same clay lit from within reads as a glowing one against a dark sky. So the colour stays
+# put and the emission follows the hour: nothing by day, plenty by night.
+LOGO_COLOR = "#9E3B1B"
+LOGO_EMIT_DAY = 0.0
+LOGO_EMIT_NIGHT = 2.6
 SANGRIA = "#E00010"        # a saturated red, lit from within so it carries through the glass.
 # Tuned by measuring the rendered pixels, not by eye. The scene renders through AgX, which
 # desaturates bright emission: at 1.6 the fill came out (209,95,93), a coral. This, with a
@@ -112,14 +114,6 @@ def _hub_mesh(mat):
     b.sphere(0.055, scale=(1.0, 1.0, 0.45))
     return b.finish("UsageHub", [mat])
 
-
-def _disc_mesh(mat):
-    me = MS._existing("UsageDisc")
-    if me:
-        return me
-    b = MS._Builder()
-    b.cylinder(LOGO_DISC_R, 0.012, at=(0.0, 0.0, 0.0), segments=40)
-    return b.finish("UsageDisc", [mat])
 
 
 def _table_mesh(mat):
@@ -188,13 +182,8 @@ class Pitchers:
         logo_root.location = (x, y + LABEL_DY, LABEL_Z + 1.62)  # clear of the plates below it
         lc = logo_root.constraints.new("COPY_ROTATION")
         lc.target = P.camera()
-        disc = P.new_object("DP_UsageDisc", _disc_mesh(
-            M.flat_material("UsageDisc", LOGO_DISC, roughness=0.8)))
-        disc.parent = logo_root
-        disc.location = (0.0, 0.0, -0.03)          # just behind the arms
-        # no rotation: the root already carries the camera's, and a disc built in XY faces
-        # the viewer under it. Turning it as well stood it on edge and it read as a saucer.
-        ray_mat = M.flat_material("UsageLogo", LOGO_COLOR, roughness=0.35, emission=1.15)
+        # created with an emission so the node exists; `pulse` sets the strength each frame
+        ray_mat = M.flat_material("UsageLogo", LOGO_COLOR, roughness=0.45, emission=1.0)
         hub = P.new_object("DP_UsageHub", _hub_mesh(ray_mat))
         hub.parent = logo_root
         rays = []
@@ -205,10 +194,11 @@ class Pitchers:
             ray.rotation_euler = (0.0, 0.0, a)
             ray.scale = (LOGO_MIN, 1.0, 1.0)
             rays.append(ray)
-        for o in (logo_root, disc, hub, *rays):
+        for o in (logo_root, hub, *rays):
             o["dp_kind"] = "deck"
         self.objects["logo_root"] = logo_root
         self.objects["rays"] = rays
+        self.objects["logo_mat"] = ray_mat
 
     def update(self, usage) -> None:
         """Pour each jug to its window's fraction and write the reset time under it."""
@@ -266,13 +256,17 @@ class Pitchers:
             except ReferenceError:
                 return
 
-    def pulse(self, now: float) -> None:
+    def pulse(self, now: float, night: float = 0.0) -> None:
         """Reach the arms out and draw them back, one wave running round the burst.
 
         Each arm is a quarter-turn behind the one before it, so the burst breathes in a
         rotating wave rather than all at once -- which is what the Claude mark does while it
         is thinking. The arms' own root copies the camera's rotation, so the whole thing
         stays face-on however the camera moves.
+
+        `night` is the sky's own 0-to-1, and it decides how much the mark is lit from within.
+        By day it is unlit, and the deep clay reads as a dark shape against a bright sky; by
+        night it glows, and reads as a bright one against a dark sky. One colour, both skies.
         """
         rays = self.objects.get("rays")
         if not rays:
@@ -284,5 +278,11 @@ class Pitchers:
                 phase = 2 * math.pi * i / LOGO_RAYS
                 s = mid + half * math.sin(now * 2 * math.pi * LOGO_PULSE_HZ - phase)
                 ray.scale = (s, 1.0, 1.0)
-        except ReferenceError:
+            mat = self.objects.get("logo_mat")
+            if mat is not None:
+                want = LOGO_EMIT_DAY + (LOGO_EMIT_NIGHT - LOGO_EMIT_DAY) * max(0.0, min(1.0, night))
+                inp = mat.node_tree.nodes["Principled BSDF"].inputs["Emission Strength"]
+                if abs(inp.default_value - want) > 1e-3:
+                    inp.default_value = want
+        except (ReferenceError, KeyError, AttributeError):
             self.objects = {}
