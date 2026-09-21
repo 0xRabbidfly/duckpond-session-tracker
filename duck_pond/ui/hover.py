@@ -558,7 +558,7 @@ class DUCKPOND_OT_hover(bpy.types.Operator):
             metrics.append((max(body_w, blf.dimensions(FONT, heading)[0]), name_w))
         width = sum(w for w, _ in metrics) + col_gap * (len(cols) - 1) + 2 * PAD
         body_rows = max(len(rows) for _h, rows in cols)
-        height = (body_rows + 1) * LINE_H + 8 + LINE_H + 2 * PAD  # + a row for the H hint
+        height = (body_rows + 1) * LINE_H + 8 + 2 * PAD
 
         ui_w = 0
         if context.area:
@@ -569,9 +569,11 @@ class DUCKPOND_OT_hover(bpy.types.Operator):
         y1 = y0 + height
         self._rect(x0, y0, x1, y1, BG)
 
+        head_y = y1 - PAD - LINE_H + 4
+        row0_y = head_y - LINE_H - 8
         x = x0 + PAD
         for (heading, rows), (col_w, name_w) in zip(cols, metrics):
-            y = y1 - PAD - LINE_H + 4
+            y = head_y
             blf.size(FONT, 12)
             blf.color(FONT, 0.55, 0.72, 0.86, 1.0)
             blf.position(FONT, x, y, 0)
@@ -599,9 +601,12 @@ class DUCKPOND_OT_hover(bpy.types.Operator):
                     blf.draw(FONT, note)
                 y -= LINE_H
             x += col_w + col_gap
+        # The hint goes in the hole the short columns leave. Hats run two rows longer than
+        # every other column, so the bottom-left corner is empty: putting it there instead of
+        # on a line of its own takes a whole row off the height of the box.
         hint = "H hides this key"
         blf.color(FONT, 0.45, 0.50, 0.58, 1.0)
-        blf.position(FONT, x1 - PAD - blf.dimensions(FONT, hint)[0], y0 + PAD - 4, 0)
+        blf.position(FONT, x0 + PAD, row0_y - (body_rows - 1) * LINE_H, 0)
         blf.draw(FONT, hint)
         blf.size(FONT, 13)
 

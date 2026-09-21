@@ -148,18 +148,59 @@ def herdr_window():
 
 
 def _raise_window() -> None:
-    """Bring Herdr's window to the front. Focusing a pane changes which pane is active inside
-    Herdr; it does not raise the window, and on a second monitor that is the difference between
-    seeing the terminal and not."""
+    """Bring Herdr's window to the front.
+
+    Focusing a pane changes which pane is active inside Herdr; it does not raise the window,
+    and behind a full-screen pond that is the difference between seeing the terminal and not.
+
+    Windows guards the foreground aggressively: `SetForegroundWindow` returns 0 and does
+    nothing at all when it decides another app owns the user's attention, and it reports that
+    by a return code, not an exception -- which is how the first version of this failed in
+    silence. So try in order of politeness and stop at the first that takes.
+    """
     try:
         import ctypes
         hwnd = herdr_window()
         if hwnd is None:
             return                            # the CLI can reach a server with no GUI attached
+        from ctypes import wintypes
         u32 = ctypes.windll.user32
+        k32 = ctypes.windll.kernel32
+        # Spell out the signatures: a bare ctypes call passes a handle as a 32-bit int, and
+        # HWND_TOPMOST is the handle -1, which has to arrive as all ones and not as garbage.
+        u32.SetForegroundWindow.argtypes = [wintypes.HWND]
+        u32.BringWindowToTop.argtypes = [wintypes.HWND]
+        u32.SetWindowPos.argtypes = [wintypes.HWND, wintypes.HWND, ctypes.c_int, ctypes.c_int,
+                                     ctypes.c_int, ctypes.c_int, ctypes.c_uint]
+        if u32.GetForegroundWindow() == hwnd:
+            return
         if u32.IsIconic(hwnd):
-            u32.ShowWindow(hwnd, 9)           # SW_RESTORE
-        u32.SetForegroundWindow(hwnd)
+            u32.ShowWindow(hwnd, 9)           # SW_RESTORE -- never SW_SHOWNORMAL, which
+                                              # would un-maximise a maximised terminal
+        if u32.SetForegroundWindow(hwnd):
+            return
+
+        # Borrow the input queue of whoever holds the foreground: attached threads share a
+        # notion of focus, so Windows stops treating this as one app barging in front of another.
+        fg = u32.GetForegroundWindow()
+        mine, theirs = k32.GetCurrentThreadId(), u32.GetWindowThreadProcessId(fg, None)
+        attached = theirs and u32.AttachThreadInput(mine, theirs, True)
+        try:
+            u32.BringWindowToTop(hwnd)
+            if u32.SetForegroundWindow(hwnd):
+                return
+        finally:
+            if attached:
+                u32.AttachThreadInput(mine, theirs, False)
+
+        # Last resort: z-order needs no permission. This puts the window in front without
+        # moving the keyboard focus, which is most of what was wanted anyway.
+        flags = 0x0001 | 0x0002 | 0x0010      # NOSIZE | NOMOVE | NOACTIVATE
+        u32.SetWindowPos(hwnd, wintypes.HWND(-1), 0, 0, 0, 0, flags)   # HWND_TOPMOST
+        u32.SetWindowPos(hwnd, wintypes.HWND(-2), 0, 0, 0, 0, flags)   # NOTOPMOST: do not stick
+        if u32.GetForegroundWindow() != hwnd and not u32.SetForegroundWindow(hwnd):
+            _warn("raise", "Windows would not bring the terminal to the front; "
+                           "the pane is focused, so alt-tab to Herdr and it is there")
     except Exception as exc:  # noqa: BLE001 - raising a window is a nicety, never a failure
         _warn("raise", f"could not raise the window: {exc}")
 
@@ -173,11 +214,18 @@ def focus_session(session_id: str, raise_window: bool = True) -> None:
         try:
             pane = pane_for(session_id)
             if pane is None:
-                return          # not every duck is a Herdr pane: a session can outlive its tab
+                # Not every duck is a Herdr pane -- a session outlives the tab that ran it --
+                # so this is normal, but say it once: a click that does nothing and explains
+                # nothing is the worst of both.
+                _warn("nopane", f"session {session_id[:8]} is not running in any Herdr pane")
+                return
             rc, _out, err = _run("agent", "focus", pane)
             if rc != 0:
                 _warn("focus", f"could not focus {pane}: {err[:120]}")
                 return
+            # Say so once. Anyone wiring this up wants one line proving the click reached
+            # Herdr, and when it does not, the line above says where it stopped instead.
+            _warn("first", f"focused pane {pane} for session {session_id[:8]}")
             if raise_window:
                 _raise_window()
         except (OSError, subprocess.SubprocessError) as exc:

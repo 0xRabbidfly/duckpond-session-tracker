@@ -12,6 +12,11 @@ All notable changes to Duck Pond are recorded here. The format follows
   on the Claude session id, which `herdr agent list` reports per pane and the duck is named
   for, so it never matches on a terminal title. On a worker thread, silent when Herdr is not
   installed, and off in the sidebar (`duck_pond/herdr.py`).
+  Raising the window takes three tries: `SetForegroundWindow` alone, then the same with
+  the foreground thread's input queue attached, then a topmost flip, which needs no
+  permission at all. Windows refuses the first outright when it decides another app owns
+  your attention, and it says so in a return code rather than an exception, so the first
+  cut of this failed in silence.
 - **Sangria jugs**: two jugs on the far deck fill with your Anthropic 5-hour and 7-day usage,
   with the percentage and reset time on a label above each. Read from `claude -p /usage` on a
   worker thread every 15 minutes (`duck_pond/usage_limits.py`), with `--no-session-persistence`
@@ -45,6 +50,8 @@ All notable changes to Duck Pond are recorded here. The format follows
   far on a fixed line, and ≈$ bars for the range with their peak.
 
 ### Changed
+- The on-screen key is a row shorter: `H hides this key` moved off a line of its own into
+  the empty bottom-left corner, level with the last hat.
 - **The board moved to the screen.** All of it -- status row, range tabs, both spend lines,
   the sparkline and the footer -- is drawn across the top in screen space, last of everything.
   As geometry on the far deck a duck's name tag would park on top of it, and the far half was
