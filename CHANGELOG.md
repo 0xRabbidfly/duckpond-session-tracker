@@ -50,6 +50,14 @@ All notable changes to Duck Pond are recorded here. The format follows
   far on a fixed line, and ≈$ bars for the range with their peak.
 
 ### Changed
+- The bather sits propped on both hands, planted on the deck out beside her hips, and
+  leans back a few degrees onto them all the time. Her arms used to fold in behind her
+  back -- the left hand at y +0.255, the right swinging round to almost her centreline --
+  so from the front she had no arms at all. Both arms are now the same arm: the right one
+  is still a separate object so it can wave, but its joints are the left one's carried
+  into its own frame, so the two match at rest. The raise sweeps the hand forward through
+  straight-out rather than backward, and eases slower to hold the same per-frame budget
+  over a longer swing.
 - The on-screen key is a row shorter: `H hides this key` moved off a line of its own into
   the empty bottom-left corner, level with the last hat.
 - **The board moved to the screen.** All of it -- status row, range tabs, both spend lines,
@@ -97,6 +105,12 @@ All notable changes to Duck Pond are recorded here. The format follows
 - README screenshots live in `docs/media/` so they render on GitHub.
 
 ### Fixed
+- Procedural meshes took their neighbour's material at every primitive boundary. The
+  builder tagged each new primitive as `faces[n:]` after building it, and bmesh gives no
+  promise that a new face lands at the end of the array: on a cone followed by a sphere,
+  19 faces of 254 came out wrong. It now tracks which faces existed before, by identity.
+  Every `DP_*` object was affected; it showed up as a forearm rendering in the colour of
+  the hand beside it, and shins in the colour of their ankle joints.
 - **Context was pinned at 100 % on nearly every duck.** Opus was mapped to a 200K window; it
   has had 1M since 4.6, so a session a quarter full read as about to overflow. Across the
   transcripts on this machine that was 8,339 replies of 18,972 clamped to full. Matching is

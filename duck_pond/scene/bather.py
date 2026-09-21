@@ -12,10 +12,11 @@ which cannot go into an MIT repo; and the CC0 packs that are reachable are envir
 fantasy humans and skeletons. Drop a `.glb` in and it can be imported instead.)
 
 She carries no data and means nothing, like the floating toys. She is there so the pool looks
-occupied rather than like a chart with a duck on it. She idles continuously -- a slow sway,
-feet waving in the water -- and every so often leans back on her hands, tips her face up to
-the sun and swings her head slowly side to side. Nothing here is allowed to be a statue, and
-a motion that only ever loops is nearly one.
+occupied rather than like a chart with a duck on it. She sits propped on both hands, planted
+on the deck out beside her hips, and idles continuously -- a slow sway, feet waving in the
+water -- and every so often leans further back, tips her face up to the sun and swings her
+head slowly side to side. Nothing here is allowed to be a statue, and a motion that only ever
+loops is nearly one.
 """
 from __future__ import annotations
 
@@ -48,6 +49,7 @@ VISOR = "#14161A"            # her sunglasses, which on an android is a visor
 NECK = (0.0, 0.02, 0.74)     # where the head pivots, in her local space (-Y is forward)
 HIPS = ((0.108, -0.01, 0.28), (-0.108, -0.01, 0.28))
 
+REST_LEAN = math.radians(7)  # always a little back on her hands, so the arms carry her
 LEAN_EVERY = 34.0            # seconds between sunbathes
 LEAN_HOLD = 9.0              # how long she stays back
 LEAN_BACK = math.radians(26)
@@ -60,18 +62,27 @@ HEAD_YAW = math.radians(26)
 HEAD_UP = math.radians(30)
 SWAY_HZ = 0.06
 
+# Both hands are planted on the deck out beside her hips, well clear of her silhouette. They
+# used to fold in behind her back -- the left hand at y +0.255, the right swinging round to
+# x 0.02, almost on her centreline -- so from the front she had no arms at all.
+ELBOW = (0.265, 0.129, 0.438)   # out to the side, in the body's frame before the rest lean
+HAND = (0.305, 0.157, 0.167)    # flat on the deck; the lean lifts it to land on z 0.15
+ARM_TIP = (0.0, 0.0, 0.529)     # the right hand in the arm's own frame, for posing and tests
+
 # Her right arm is its own object so it can be raised. Built pointing straight up from the
-# shoulder, which makes both poses easy to state: REST swings it down and back to the deck,
-# WAVE brings it up and out. Blending the X angle between them sweeps through "straight
-# forward", which is the arc an arm actually takes.
+# shoulder, which makes both poses easy to state: REST swings it down and out to the deck,
+# WAVE brings it up and out. REST's X is given the long way round (194 deg, not -166) so that
+# easing between them sweeps the hand forward through straight-out, which is the arc an arm
+# actually takes; the short way round would swing it backwards.
 ARM_SHOULDER = (0.145, 0.03, 0.655)
-ARM_REST = (math.radians(-159), math.radians(14), 0.0)
-ARM_WAVE = (math.radians(-18), math.radians(30), 0.0)
+ARM_REST = (math.radians(193.8), math.radians(-18.2), 0.0)
+ARM_WAVE = (math.radians(-10), math.radians(34), 0.0)
 WAVE_SWING = math.radians(17)   # how far the raised hand swings either side
 WAVE_HZ = 0.85
-WAVE_EASE = 1.8                 # how fast the arm goes up and comes down, per second.
-# Measured: at 2.6 the arm moved 11 deg in a frame at 30 fps, which is a flick rather
-# than a raise. At 1.8 the worst frame is about 8 deg and it still reads as prompt.
+WAVE_EASE = 1.2                 # how fast the arm goes up and comes down, per second.
+# Measured: the raise is a 204 deg sweep now that it starts from the deck, so the same
+# per-frame budget buys less ease. At 1.2 the worst frame at 30 fps is 8 deg, which was
+# the limit the old 141 deg sweep was tuned to; above that it flicks rather than lifts.
 
 SH, AC, JT, VI = 0, 1, 2, 3  # material slots
 
@@ -114,28 +125,34 @@ def _body_mesh(shell, accent, joint, visor):
     # separate object so it can be raised, and only its shoulder ball is built here
     b.sphere(0.058, at=ARM_SHOULDER, slot=JT)
     sx = -1
-    shoulder = (sx * 0.145, 0.03, 0.655)
-    elbow = (sx * 0.205, 0.165, 0.38)
-    hand = (sx * 0.225, 0.255, 0.07)
+    shoulder = (sx * ARM_SHOULDER[0], ARM_SHOULDER[1], ARM_SHOULDER[2])
+    elbow = (sx * ELBOW[0], ELBOW[1], ELBOW[2])
+    hand = (sx * HAND[0], HAND[1], HAND[2])
     b.sphere(0.058, at=shoulder, slot=JT)
     _limb(b, shoulder, elbow, 0.048, 0.040, slot=SH)
     b.sphere(0.042, at=elbow, slot=JT)
     _limb(b, elbow, hand, 0.040, 0.033, slot=SH)
-    b.sphere(0.048, at=hand, scale=(1.0, 1.25, 0.65), slot=AC)                # palm on the deck
+    b.sphere(0.048, at=hand, scale=(1.0, 1.25, 0.70), slot=AC)                # palm on the deck
     return b.finish("Bather", [shell, accent, joint, visor])
 
 
 def _arm_mesh(shell, accent, joint):
-    """Her right arm, origin at the shoulder, built pointing straight up."""
+    """Her right arm, origin at the shoulder, built pointing straight up.
+
+    The joints are the mirror of the left arm's, carried into the arm's own frame by the
+    inverse of ARM_REST. Built that way the two arms are the same arm at rest -- same upper
+    and forearm lengths, same outward bow at the elbow -- and the wave is still one rotation.
+    """
     me = MS._existing("BatherArm")
     if me:
         return me
     b = MS._Builder()
-    elbow, hand = (0.018, 0.0, 0.275), (0.048, -0.022, 0.555)
+    elbow, hand = (0.046, -0.038, 0.261), ARM_TIP
     _limb(b, (0.0, 0.0, 0.0), elbow, 0.048, 0.040, slot=SH)
     b.sphere(0.042, at=elbow, slot=JT)
     _limb(b, elbow, hand, 0.040, 0.033, slot=SH)
-    b.sphere(0.049, at=hand, scale=(1.0, 0.72, 1.15), slot=AC)                # the hand itself
+    # squashed along the arm, which at rest points at the deck: a flat palm either way up
+    b.sphere(0.048, at=hand, scale=(1.0, 1.15, 0.70), slot=AC)
     return b.finish("BatherArm", [shell, accent, joint])
 
 
@@ -223,9 +240,10 @@ class Bather:
         wave = self._wave
         lean = _envelope(now) * (1.0 - wave)
         try:
-            # back on her hands during the lean; the rest of the time she just sways
+            # always a little back on her hands, further back during the lean
             self.body.rotation_euler = (
-                math.radians(2.5) * math.sin(now * 2 * math.pi * SWAY_HZ) + LEAN_BACK * lean,
+                REST_LEAN + math.radians(2.5) * math.sin(now * 2 * math.pi * SWAY_HZ)
+                + LEAN_BACK * lean,
                 0.0,
                 FACING + math.radians(2.0) * math.sin(now * 2 * math.pi * SWAY_HZ * 0.6),
             )

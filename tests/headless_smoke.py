@@ -16,6 +16,7 @@ sys.path.insert(0, ROOT)
 import duck_pond  # noqa: E402
 from duck_pond.adapters.stub import StubAdapter  # noqa: E402
 from duck_pond.runtime import RT  # noqa: E402
+from duck_pond.scene import bather as bather_mod  # noqa: E402
 from duck_pond.scene import props as props_mod  # noqa: E402
 from duck_pond.scene.pitchers import JUG_H, WALL  # noqa: E402
 from duck_pond.ui import cards  # noqa: E402
@@ -115,18 +116,45 @@ _q = RT.fleet.sessions["cc-opus-2"]
 _saved_q, _q.question = _q.question, "Which one?"
 check(_q.blocked_on_you(), "a pending question counts as blocked on you")
 _q.question = _saved_q
+# how high her hand is, which is the thing that matters -- the euler angle it comes from
+# runs the other way now that the arm starts on the deck, and a test should not care
+def _hand_z():
+    bpy.context.view_layer.update()   # matrix_world is stale until the depsgraph catches up
+    return (obj("DP_BatherArm").matrix_world @ Vector(bather_mod.ARM_TIP)).z
+
+
 # settle her arm down first: the fixture may already have her hand up
 for _i in range(150):
     RT.bather.update(t0 + _t + _i / 30.0, 1 / 30.0, None, False)
-_rest = obj("DP_BatherArm").rotation_euler.x
+_rest, _rest_x = _hand_z(), obj("DP_BatherArm").rotation_euler.x
+check(_rest < 0.35, f"at rest her hand is down on the deck (z {_rest:+.3f}, deck top 0.10)")
 for _i in range(150):
     RT.bather.update(t0 + _t + 5 + _i / 30.0, 1 / 30.0, None, True)
-_up = obj("DP_BatherArm").rotation_euler.x
+_up = _hand_z()
 check(_up > _rest + 1.0,
-      f"her arm comes up when someone asks you something ({math.degrees(_rest):.0f} to {math.degrees(_up):.0f} deg)")
+      f"her arm comes up when someone asks you something (z {_rest:+.3f} to {_up:+.3f})")
 for _i in range(200):
     RT.bather.update(t0 + _t + 10 + _i / 30.0, 1 / 30.0, None, False)
-check(abs(obj("DP_BatherArm").rotation_euler.x - _rest) < 0.02, "and goes back down once you have answered")
+check(abs(obj("DP_BatherArm").rotation_euler.x - _rest_x) < 0.02,
+      "and goes back down once you have answered")
+# both hands rest on the deck, out beside her where you can see them: they used to fold in
+# behind her back, which from the front left her with no arms at all
+# park her out of the sunbathe first: leaning back lifts her hands off the deck, and which
+# moment this lands on is otherwise down to the wall clock. The envelope is flat from
+# LEAN_HOLD + 2 * LEAN_RISE (13.4 s) to LEAN_EVERY (34 s), so 20 s in is safely still.
+_calm = (math.floor(t0 / bather_mod.LEAN_EVERY) + 1) * bather_mod.LEAN_EVERY + 20.0
+RT.bather.update(_calm, 1 / 30.0, None, False)
+bpy.context.view_layer.update()
+_bx = RT.bather.body.matrix_world
+_lh = _bx @ Vector((-bather_mod.HAND[0], bather_mod.HAND[1], bather_mod.HAND[2]))
+_rh = obj("DP_BatherArm").matrix_world @ Vector(bather_mod.ARM_TIP)
+_hip = _bx @ Vector((0.205, 0.02, 0.28))          # the edge of her hip shell
+check(abs(_lh.x - _rh.x) > 2 * abs(_hip.x - _bx.translation.x),
+      f"her hands are outboard of her hips ({abs(_lh.x - _rh.x):.2f} m apart)")
+_palm = 0.048 * 0.70 * bather_mod.SCALE           # half the thickness of a palm
+check(max(abs(_lh.z - _palm - 0.10), abs(_rh.z - _palm - 0.10)) < 0.05,
+      f"and both are down on the deck (undersides {_lh.z - _palm:+.3f} and "
+      f"{_rh.z - _palm:+.3f}, deck top 0.10)")
 # the noodles roam the pool and push out of whatever they meet
 _nd = RT.props.noodles
 check(len(_nd) >= 2, f"there are noodles to collide ({len(_nd)})")

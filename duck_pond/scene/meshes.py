@@ -36,13 +36,23 @@ class _Builder:
         self.bm = bmesh.new()
 
     def _mark(self):
-        return len(self.bm.faces)
+        """Which faces exist already, by identity rather than by count.
 
-    def _assign(self, start: int, slot: int, smooth: bool = True):
+        `faces[n:]` after an op looks like it would name exactly the new faces, and it does
+        not: bmesh gives no promise that a new face lands at the end of the array. Measured
+        on nothing more than a cone followed by a sphere, 19 faces of 254 took their
+        neighbour's material -- which is why limbs came out in the colour of the joint beside
+        them and a forearm could render as a hand.
+        """
         self.bm.faces.ensure_lookup_table()
-        for f in self.bm.faces[start:]:
-            f.material_index = slot
-            f.smooth = smooth
+        return set(self.bm.faces)
+
+    def _assign(self, before: set, slot: int, smooth: bool = True):
+        self.bm.faces.ensure_lookup_table()
+        for f in self.bm.faces:
+            if f not in before:
+                f.material_index = slot
+                f.smooth = smooth
 
     def sphere(self, r, at=(0, 0, 0), scale=(1, 1, 1), slot=0, u=20, v=12):
         m = self._mark()
