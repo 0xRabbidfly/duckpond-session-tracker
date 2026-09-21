@@ -22,15 +22,17 @@ empty and magenta when it is full. The sun follows your clock; after dark the li
 on and the ducks glow. A **board** across the top of the screen carries the live count and the
 spend; each lane sign on the west deck carries branches, sessions and that folder's spend; and
 two **jugs of sangria** on the far deck fill with your Anthropic 5-hour and 7-day usage.
+An android sits on the edge with her feet in the water; she puts a hand up when a duck is
+stopped waiting on an answer from you. Pool noodles drift about and bump into the ducks.
 Spec: [`SPEC.md`](SPEC.md), §15 for what changed in v0.2. Code tour:
 [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
 
-![The pool: four lanes, ducks with hats, ducklings on tethers, the scoreboard on the far deck](docs/media/overview.jpg)
+![The pool: four lanes, ducks with hats, ducklings on tethers, the sangria jugs on the far deck](docs/media/overview.jpg)
 
 | | |
 |---|---|
 | ![A busy fleet: chips, packets, wakes](docs/media/busy.jpg) | ![A duck blocked on a permission: red lamp, red halo, red rings](docs/media/blocked.jpg) |
-| ![Kiosk mode: name and status tag on every duck](docs/media/kiosk_tags.jpg) | ![After dark: lido lamps on, ducks glowing](docs/media/night.jpg) |
+| ![Kiosk mode: name and status tag on every duck](docs/media/kiosk_tags.jpg) | ![After dark: lido lamps on, ducks glowing, stars over the horizon](docs/media/night.jpg) |
 
 ## Run it
 
@@ -122,6 +124,8 @@ clock override to preview the night lido.
 | dark water, lido lamps, glowing ducks | it is after 20:30 on your clock |
 | a flamingo float, a beach ball, a lily pad drifting at the edge | nothing at all; the pool is a place, not only a chart |
 
+![Compaction: the geyser goes up, the duck pops up with it](docs/media/compaction.jpg)
+
 The board runs across the top of the screen. It reads `N WORKING · N WAITING · N BLOCKED ·
 N IDLE`, then five range tabs (`min` `hour` `day` `week` `month`; click one or press `T`).
 Under them: spend, output tokens and sessions for the picked range (`last 24 h`), the same for
@@ -160,7 +164,7 @@ the duck is named for, so the match is exact -- focuses it, and raises the windo
 Herdr. Nothing happens if Herdr is not installed, and the whole thing turns off in the
 sidebar, which you may want, since focusing a terminal takes the focus off the pool.
 
-![The hover card: state bar, context meter, the question quoted, current tool, sub-agents](docs/media/hover_card.jpg)
+![The hover card: state bar, context meter, the question quoted, what you said, the queue](docs/media/hover_card.jpg)
 
 ## Data and privacy
 

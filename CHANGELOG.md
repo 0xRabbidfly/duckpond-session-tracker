@@ -50,6 +50,12 @@ All notable changes to Duck Pond are recorded here. The format follows
   far on a fixed line, and ≈$ bars for the range with their peak.
 
 ### Changed
+- All seven README screenshots re-rendered. They were made before the android, the
+  noodles and the horizon existed, and the overview was still captioned as showing a
+  scoreboard on the far deck, which moved onto the screen two releases ago. The hover
+  card shot now catches a duck with a question open, which is what its caption always
+  claimed. All from `fixtures/demo.json` with sample usage figures, so no screenshot
+  carries a real path, project name or usage reading.
 - The bather sits propped on both hands, planted on the deck out beside her hips, and
   leans back a few degrees onto them all the time. Her arms used to fold in behind her
   back -- the left hand at y +0.255, the right swinging round to almost her centreline --
