@@ -20,6 +20,7 @@ from bpy_extras import view3d_utils
 from gpu_extras.batch import batch_for_shader
 from mathutils import Vector
 
+from .. import herdr
 from ..runtime import RT
 from ..scene import pool as P
 from ..theme import (
@@ -116,6 +117,9 @@ class DUCKPOND_OT_hover(bpy.types.Operator):
             # behind. A duck, duckling or tether pins its card and tag; anywhere else releases it.
             self._cast(context, event)
             RT.pinned = RT.hover
+            if RT.pinned and RT.herdr_focus:
+                # A duckling belongs to its parent's session, so key[0] is the terminal either way.
+                herdr.focus_session(RT.pinned[0])
             context.area.tag_redraw()
             return {"PASS_THROUGH"}
         if event.value == "PRESS" and not (event.ctrl or event.alt or event.oskey):

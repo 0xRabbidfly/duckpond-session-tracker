@@ -87,6 +87,7 @@ def _go():
     duck_pond.RT.start(adapters)
     duck_pond.RT.director.enabled = props.director
     duck_pond.RT.tags_for_all = props.tags_for_all
+    duck_pond.RT.herdr_focus = props.herdr_focus
     # app mode: the viewport copies the pool camera instead of looking through it, so the pool
     # fills the window with no camera frame around it
     duck_pond.RT.view_locked = APP_MODE

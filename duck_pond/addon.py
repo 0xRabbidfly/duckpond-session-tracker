@@ -103,6 +103,10 @@ def _on_legend(self, context):
     RT.show_legend = self.legend
 
 
+def _on_herdr(self, context):
+    RT.herdr_focus = self.herdr_focus
+
+
 class DuckPondSettings(bpy.types.PropertyGroup):
     use_claude: bpy.props.BoolProperty(name="Claude Code (live)", default=True)
     use_stub: bpy.props.BoolProperty(name="Demo fixture", default=False)
@@ -131,6 +135,10 @@ class DuckPondSettings(bpy.types.PropertyGroup):
                                             update=_on_limits,
                                             description="How often to ask the CLI. Lower costs more tokens; "
                                                         "the windows move slowly, so 15 minutes is plenty")
+    herdr_focus: bpy.props.BoolProperty(name="Click a duck to focus Herdr", default=True,
+                                        update=_on_herdr,
+                                        description="Clicking a duck brings its terminal to the front in Herdr. "
+                                                    "This takes the window focus away from the pond")
 
 
 def build_adapters(props=None):
@@ -168,6 +176,7 @@ class DUCKPOND_OT_start(bpy.types.Operator):
         RT.set_board_range(props.board_range)
         RT.limits.enabled = props.limits
         RT.limits.refresh_s = float(props.limits_every_min) * 60.0
+        RT.herdr_focus = props.herdr_focus
         _on_sound(props, context)
         _on_clock(props, context)
         return {"FINISHED"}

@@ -212,6 +212,11 @@ and count how many sessions are actually working.
   list (latest 50, expandable), all sub-agents, per-model token/cost table, and buttons:
   *Follow with camera*, *Open transcript file*, *Copy session id*.
 - Panel header: pool totals (ducks, ducklings, active, waiting, tokens/min).
+- If [Herdr](https://herdr.dev) is on `PATH`, a click also focuses the terminal pane running
+  that session and raises the window Herdr is showing in. The pane is found by matching the
+  Claude session id reported by `herdr agent list` -- never by terminal title, which is
+  whatever the pane last printed. A duckling focuses its parent's terminal. All of it happens
+  on a worker thread and no failure ever reaches the viewport; off in the sidebar.
 
 ### 7.3 Keyboard
 - `Space` pause/resume live updates (scene keeps animating, data freezes).

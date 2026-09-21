@@ -43,6 +43,7 @@ but skips its effect.
 | Sim | `sim/motion.py`, `sim/director.py` | yes (Vector only) | Per-frame continuous motion. Everything must respect the smoothness contract. |
 | UI | `ui/cards.py`, `ui/hover.py`, `ui/panel.py` | yes | `cards.py` is pure text assembly (testable); `hover.py` draws it. |
 | Sound | `sound.py` | yes (`aud`) | Optional. Synthesized cues, no asset files. |
+| Herdr | `herdr.py` | no | Optional. Maps a session id to a terminal pane and raises it. `pane_in` is pure; the rest is subprocess and Win32, always on a thread. |
 
 The pure layers are why `python tests/test_core.py` works without Blender. Keep new logic
 in `model.py` when you can and let the scene read the result.

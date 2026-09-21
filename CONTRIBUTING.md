@@ -39,6 +39,7 @@ compaction, an error) in 75 seconds. Most work can be done against it without a 
 ruff check .                                             # lint, configured in pyproject.toml
 python tests\test_core.py                                # reducer, redaction, adapter on real logs
 python tests\test_signals.py                             # questions, denials, compaction, queue, cost, inference
+python tests\test_herdr.py                               # picking a Herdr pane from a session id
 blender -b --python tests\headless_motion.py             # the smoothness contract
 blender -b --python tests\headless_smoke.py              # builds the demo, checks every visual, renders a still
 blender -b --python tests\headless_director.py           # camera + sky continuity under a busy fleet

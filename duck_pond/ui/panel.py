@@ -5,6 +5,7 @@ import time
 
 import bpy
 
+from .. import herdr
 from ..runtime import RT
 from ..theme import redact
 from . import cards
@@ -56,6 +57,8 @@ class VIEW3D_PT_duck_pond(bpy.types.Panel):
         row.prop(props, "director", toggle=True, icon="CAMERA_DATA")
         row.prop(props, "sound", toggle=True, icon="SPEAKER")
         row.prop(props, "legend", toggle=True, icon="HELP")
+        if herdr.available():
+            box.prop(props, "herdr_focus", toggle=True, icon="CONSOLE")
         row = box.row(align=True)
         row.operator("duck_pond.camera_overview", text="Overview", icon="VIEW_CAMERA")
         row.operator("duck_pond.camera_lane", text="Next lane", icon="TRACKING_FORWARDS")

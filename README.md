@@ -78,7 +78,7 @@ clock override to preview the night lido.
 | Key (viewport) | Action |
 |---|---|
 | hover | card for the duck / duckling / tether under the mouse |
-| click | pin the card to that duck / duckling: it tracks it until you click elsewhere (full details in the sidebar) |
+| click | pin the card to that duck / duckling: it tracks it until you click elsewhere (full details in the sidebar). With [Herdr](https://herdr.dev) running, this also brings that session's terminal to the front |
 | click a range tab on the board | switch the board's range: `min` `hour` `day` `week` `month` |
 | `T` | cycle the board's range |
 | `H` | show / hide the on-screen key (halo = state, body colour = tool, hat = model) |
@@ -153,6 +153,13 @@ what it said, sub-agents, queue, permission mode, tool mix of the last 10 minute
 hover; the sidebar (all of that plus spend per model, sub-agent list, packets, last tools)
 is the click. Packet text rides a tether only for the hovered or pinned session.
 
+**Click a duck, get its terminal.** If you run your agents under
+[Herdr](https://herdr.dev), clicking a duck also brings that session's terminal to the front:
+Duck Pond asks `herdr agent list` which pane is running that Claude session id -- the same id
+the duck is named for, so the match is exact -- focuses it, and raises the window hosting
+Herdr. Nothing happens if Herdr is not installed, and the whole thing turns off in the
+sidebar, which you may want, since focusing a terminal takes the focus off the pool.
+
 ![The hover card: state bar, context meter, the question quoted, current tool, sub-agents](docs/media/hover_card.jpg)
 
 ## Data and privacy
@@ -209,6 +216,7 @@ duck_pond/
   theme.py           harness colours, model → hat, state colours, tool categories, redaction
   adapters/          claude_code.py (tail follower), stub.py (fixture replay), base.py
   usage_limits.py    the 5-hour and 7-day limits, read from `claude -p /usage` on its own thread
+  herdr.py           click a duck to raise its terminal in Herdr (pane lookup by session id)
   scene/             pool (water, tiled deck, lawn), duck (beacon, context ring, mail, glow),
                      tether, ripples, fx (chips, orbs, geyser, rain), deck (lane signs),
                      pitchers (the sangria jugs), props (floating toys), sky (sun, night, chop, rain)
@@ -222,7 +230,7 @@ duck_pond/
 launcher/            DuckPond.exe source (finds Blender, unpacks the add-on, starts the pool) + icon
 fixtures/demo.json   scripted demo: fan-out, nested + background agents, question, denial, compaction
 dev/                 launch.py|cmd, build_exe.py, render_showcase.py, gui_shot.py, render_icon.py
-tests/               core, signals, ledger, usage, headless motion / smoke / director / watchdog
+tests/               core, signals, ledger, usage, herdr, headless motion / smoke / director / watchdog
 docs/                ARCHITECTURE.md, media/
 ```
 

@@ -7,6 +7,11 @@ All notable changes to Duck Pond are recorded here. The format follows
 ## [Unreleased]
 
 ### Added
+- **Click a duck, get its terminal**: with [Herdr](https://herdr.dev) running, clicking a duck
+  focuses the pane running that session and raises the window Herdr is showing in. The join is
+  on the Claude session id, which `herdr agent list` reports per pane and the duck is named
+  for, so it never matches on a terminal title. On a worker thread, silent when Herdr is not
+  installed, and off in the sidebar (`duck_pond/herdr.py`).
 - **Sangria jugs**: two jugs on the far deck fill with your Anthropic 5-hour and 7-day usage,
   with the percentage and reset time on a label above each. Read from `claude -p /usage` on a
   worker thread every 15 minutes (`duck_pond/usage_limits.py`), with `--no-session-persistence`
@@ -22,7 +27,7 @@ All notable changes to Duck Pond are recorded here. The format follows
 - **Grass and a tiled deck**: the deck is dark grey paving, and a procedural lawn runs ninety
   metres past it. The scene used to stop at the paving, and a window wider than the render
   showed the world background past it as flat grey bands.
-- `tests/test_usage.py` and `tests/headless_watchdog.py`; `test_ledger.py` and `test_usage.py`
+- `tests/test_herdr.py`, `tests/test_usage.py` and `tests/headless_watchdog.py`; `test_ledger.py` and `test_usage.py`
   added to the CI matrix.
 
 - Open-source scaffolding: MIT licence, contributing guide, code of conduct, security

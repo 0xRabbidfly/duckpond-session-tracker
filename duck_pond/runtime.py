@@ -70,6 +70,7 @@ class Runtime:
         self.view_locked = False  # app mode: viewports copy DP_Camera every frame (see lock_views)
         self.board_range = "hour"  # scoreboard bars and 'this range' line: min | hour | day | week | month
         self.show_legend = True  # on-screen key: halo = state, body = tool, hat = model (H)
+        self.herdr_focus = True  # clicking a duck raises its terminal in Herdr, if Herdr is here
         self.running = False
         self.paused = False
         self.last_frame_t = 0.0
