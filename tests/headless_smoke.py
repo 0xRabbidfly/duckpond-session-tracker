@@ -15,8 +15,11 @@ sys.path.insert(0, ROOT)
 
 import duck_pond  # noqa: E402
 from duck_pond.adapters.stub import StubAdapter  # noqa: E402
+from duck_pond.cli_version import Versions  # noqa: E402
 from duck_pond.runtime import RT  # noqa: E402
 from duck_pond.scene import bather as bather_mod  # noqa: E402
+from duck_pond.scene import pitchers as pitchers_mod  # noqa: E402
+from duck_pond.scene import plane as plane_mod  # noqa: E402
 from duck_pond.scene import props as props_mod  # noqa: E402
 from duck_pond.scene.pitchers import JUG_H, WALL  # noqa: E402
 from duck_pond.ui import cards  # noqa: E402
@@ -191,6 +194,36 @@ _week_label = obj("DP_JugSub_week").data.body
 check(_week_label == "Sep 26, 4pm", f"the reset time is written under the jug ({_week_label!r})")
 RT.pitchers.update(Usage(ok=False, error="no CLI"))
 check(obj("DP_JugSub_session").data.body == "no reading", "a failed read says so rather than showing zero")
+# the mark above the jugs reaches its arms out and draws them back, rather than turning
+RT.pitchers.pulse(0.0)
+_arm0 = [obj(f"DP_UsageRay{i}").scale.x for i in range(3)]
+RT.pitchers.pulse(1.0 / (4 * pitchers_mod.LOGO_PULSE_HZ))     # a quarter of the way round
+_arm1 = [obj(f"DP_UsageRay{i}").scale.x for i in range(3)]
+check(any(abs(a - b) > 0.05 for a, b in zip(_arm0, _arm1)),
+      f"the burst's arms change length over time ({_arm0[0]:.2f} -> {_arm1[0]:.2f})")
+check(len({round(s, 3) for s in _arm0}) > 1, "and they are not all the same length at once")
+check(all(pitchers_mod.LOGO_MIN - 1e-6 <= s <= pitchers_mod.LOGO_MAX + 1e-6 for s in _arm0),
+      "no arm reaches past the disc behind it")
+check(abs(obj("DP_UsageRay0").rotation_euler.z) < 1e-9, "and nothing spins any more")
+# the banner plane: it tows the two version rows across the sky, and the plate it writes
+# them on is sized to the text rather than hoping the text fits
+RT.plane.update(0.0, 1 / 30.0, Versions())      # nothing known yet
+check(obj("DP_PlaneBannerPlate").hide_render, "no version reading, no banner")
+_mid = (plane_mod.X1 - plane_mod.X0) / plane_mod.SPEED * 0.5
+RT.plane.update(_mid, 1 / 30.0, Versions(yours="2.1.9", latest="2.1.278"))
+check(not obj("DP_PlaneBannerPlate").hide_render, "with a reading, it flies")
+_top, _bot = obj("DP_PlaneRowTop").data.body, obj("DP_PlaneRowBottom").data.body
+check(_top == "LATEST  v2.1.278", f"the published version is the top row ({_top!r})")
+check(_bot.startswith("YOURS  v2.1.9"), f"and yours is underneath ({_bot!r})")
+check("UPDATE" in _bot, "2.1.9 is behind 2.1.278, and the banner says so")
+bpy.context.view_layer.update()
+_plate_w = obj("DP_PlaneBannerPlate").dimensions.x
+_text_w = max(obj("DP_PlaneRowTop").dimensions.x, obj("DP_PlaneRowBottom").dimensions.x)
+check(_plate_w > _text_w, f"the banner is wider than what is written on it ({_plate_w:.2f} vs {_text_w:.2f})")
+check(_plate_w - _text_w < 2.0, f"but not by a mile ({_plate_w - _text_w:.2f})")
+_px = obj("DP_PlaneRoot").location.x
+check(plane_mod.X0 < _px < plane_mod.X1, f"and it is somewhere over the pool ({_px:.1f})")
+check(obj("DP_PlaneRoot").location.y > 16.5, "beyond the lawn's edge, so nothing hides it")
 check(len(RT.ripples.active_rings) > 0, "water has active ripple rings")
 check(obj("DP_Duck_cc-opus-2").location.z < -0.08, "opus at 91 % of its 1M context sits low in the water")
 check(obj("DP_Duck_vscode-4").rotation_euler.y > 0.1, "tool-running duck dips its head")

@@ -18,7 +18,9 @@ sys.path.insert(0, ROOT)
 
 import duck_pond  # noqa: E402
 from duck_pond.adapters.stub import StubAdapter  # noqa: E402
+from duck_pond.cli_version import Versions  # noqa: E402
 from duck_pond.runtime import RT  # noqa: E402
+from duck_pond.scene import plane as plane_mod  # noqa: E402
 from duck_pond.scene import pool as P  # noqa: E402
 from duck_pond.usage_limits import Gauge, Usage  # noqa: E402
 
@@ -35,6 +37,9 @@ stub = StubAdapter(os.path.join(ROOT, "fixtures", "demo.json"), loop=False)
 RT.limits.enabled = False
 RT.limits.set_snapshot(Usage(session=Gauge(0.31, "8:30pm"),
                              week=Gauge(0.58, "Sep 26, 4pm"), ok=True))
+# and a sample pair for the banner plane, so a screenshot needs no network
+RT.versions.enabled = False
+RT.versions.set_snapshot(Versions(yours="2.1.273", latest="2.1.278"))
 RT.start([stub], gui=False)
 RT.sky.clock_override = 16.5  # late afternoon for the day shots
 t0 = time.time()
@@ -73,6 +78,12 @@ def render(name: str, w=1600, h=900, samples=32):
     print(f"[showcase] {name} in {time.time() - t:.1f}s")
 
 
+def fly_the_plane(frac: float = 0.42):
+    """Park the banner mid-crossing. A flypast every 150 s is otherwise pot luck, and a
+    screenshot of the pool should show the thing the screenshot is meant to show."""
+    RT.plane.update((plane_mod.X1 - plane_mod.X0) / plane_mod.SPEED * frac, 1 / 30.0,
+                    RT.versions.snapshot())
+
 def frame_camera_on(key, back=None):
     back = back if back is not None else Vector((-2.6, -4.4, 2.6))
     d = RT.ducks.get(key)
@@ -87,6 +98,7 @@ def frame_camera_on(key, back=None):
 # 1. the busy moment: chips, nested duckling, packets, the codex test just failed
 simulate_until(9.7)
 P.camera_overview()
+fly_the_plane(0.3)
 render("showcase_busy.png")
 
 # 2. compaction geyser on the opus duck (t=32) — close in
@@ -101,11 +113,13 @@ render("showcase_blocked.png")
 
 # 4. overview with a waiting duck, a background duckling on its long leash, mail, coins, the board
 P.camera_overview()
+fly_the_plane(0.42)
 render("showcase_overview.png")
 
 # 5. night lido
 RT.sky.clock_override = 22.5
 simulate_until(43.5)
+fly_the_plane(0.55)
 render("showcase_night.png")
 
 if "--no-clip" not in ARGS:

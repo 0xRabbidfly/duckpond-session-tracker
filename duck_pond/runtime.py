@@ -17,6 +17,7 @@ import bpy
 from mathutils import Matrix, Vector
 
 from .adapters.base import Adapter
+from .cli_version import CliVersions
 from .ledger import RANGE_ORDER
 from .model import Fleet
 from .scene import pool as P
@@ -25,6 +26,7 @@ from .scene.deck import LaneSigns
 from .scene.duck import DuckObj
 from .scene.fx import FX
 from .scene.pitchers import Pitchers
+from .scene.plane import BannerPlane
 from .scene.props import PoolProps
 from .scene.ripples import Ripples
 from .scene.sky import Sky
@@ -63,8 +65,10 @@ class Runtime:
         self.props = PoolProps()
         self.pitchers = Pitchers()
         self.bather = Bather()
+        self.plane = BannerPlane()  # tows your Claude Code version across the sky
         self.director = Director()
         self.limits = UsageLimits()  # the sangria jugs: your 5-hour and 7-day windows
+        self.versions = CliVersions()  # the banner plane: yours vs the published CLI
         self.sound = None  # set by the addon when enabled (sound.Sound)
         self.tags_for_all = False  # kiosk: screen-space name tags on every duck
         self.view_locked = False  # app mode: viewports copy DP_Camera every frame (see lock_views)
@@ -109,6 +113,7 @@ class Runtime:
         self.props.ensure()
         self.pitchers.ensure()
         self.bather.ensure()
+        self.plane.ensure()
         self.packets.redact_enabled = self.redact
         self.running = True
         self.paused = False
@@ -116,6 +121,7 @@ class Runtime:
         self.status = "running: " + ", ".join(a.describe() for a in adapters)
         if not bpy.app.background:
             self.limits.start()  # never from a headless run: each read is a real CLI call
+            self.versions.start()
         gui = (not bpy.app.background) if gui is None else gui
         if gui and self.threaded:
             self._start_worker()  # the worker backfills the ledger before it polls
@@ -135,6 +141,7 @@ class Runtime:
         self.status = "stopped"
         self._stop_worker()
         self.limits.stop()
+        self.versions.stop()
         for fn in (_timer, _watchdog):
             try:
                 if bpy.app.timers.is_registered(fn):
@@ -163,6 +170,7 @@ class Runtime:
         self.props = PoolProps()
         self.pitchers = Pitchers()
         self.bather = Bather()
+        self.plane = BannerPlane()
         self.director = Director()
         self.fleet = Fleet()
         coll = bpy.data.collections.get(P.COLL_NAME)
@@ -405,7 +413,8 @@ class Runtime:
         self.props.update(now, dt, self.motion.states)  # toys drift; noodles bump into things
         self.bather.update(now, dt, self.ripples, self.blocked_on_you)
         self.pitchers.scale_to_camera(cam)
-        self.pitchers.spin(now)
+        self.pitchers.pulse(now)
+        self.plane.update(now, dt, self.versions.snapshot())
         self.signs.scale_to_camera(cam)  # every lane sign the same size on screen
         if self.director.enabled and self.motion.follow is None:
             # only what you pinned; the camera never goes hunting on its own

@@ -18,6 +18,7 @@ if ROOT not in sys.path:
 
 import duck_pond  # noqa: E402
 from duck_pond.adapters.stub import StubAdapter  # noqa: E402
+from duck_pond.cli_version import Versions  # noqa: E402
 from duck_pond.runtime import RT  # noqa: E402
 from duck_pond.usage_limits import Gauge, Usage  # noqa: E402
 
@@ -73,6 +74,9 @@ def _go():
     RT.limits.enabled = False
     RT.limits.set_snapshot(Usage(session=Gauge(0.24, "Sep 19, 8:30pm"),
                                  week=Gauge(0.62, "Sep 26, 4pm"), ok=True))
+    # and a sample pair for the banner plane, so a screenshot needs no network
+    RT.versions.enabled = False
+    RT.versions.set_snapshot(Versions(yours="2.1.273", latest="2.1.278"))
     RT.start([stub])
     RT.tags_for_all = KIOSK
     if CLOCK is not None:

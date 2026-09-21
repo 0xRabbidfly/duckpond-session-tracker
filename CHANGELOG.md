@@ -7,6 +7,13 @@ All notable changes to Duck Pond are recorded here. The format follows
 ## [Unreleased]
 
 ### Added
+- **A banner plane.** Every two and a half minutes a propeller plane crosses the sky towing
+  a banner: the published Claude Code version on the top row, the one you are running
+  underneath, and `UPDATE` when you are behind. Yours comes from `claude --version`, the
+  published one from the npm registry over plain HTTP -- no npm install required -- both on
+  a worker thread, refreshed every three hours. The plate sizes itself to the rows, because
+  a version string is not a fixed width. No reading, no flypast (`duck_pond/cli_version.py`,
+  `duck_pond/scene/plane.py`).
 - **Click a duck, get its terminal**: with [Herdr](https://herdr.dev) running, clicking a duck
   focuses the pane running that session and raises the window Herdr is showing in. The join is
   on the Claude session id, which `herdr agent list` reports per pane and the duck is named
@@ -50,6 +57,18 @@ All notable changes to Duck Pond are recorded here. The format follows
   far on a fixed line, and ≈$ bars for the range with their peak.
 
 ### Changed
+- The two usage plates and everything written on them are 30% smaller, and sit closer
+  together.
+- The Claude mark above them no longer turns. Its arms reach out and draw back in, in a
+  wave running round the burst, which is what the mark does when it is thinking -- and a
+  pulse survives being small, where a slow rotation just looks like a wobble. Each arm is
+  its own object now, so its length is its scale. It also sits on a dark disc: it floats
+  against a sky that is pale by day and black by night, and no single colour contrasts with
+  both, so the disc fixes the background instead.
+- The pool-wide totals no longer sit in the bottom-left corner. They are on the board at the
+  top of the screen already, and a second copy under the hover card only ever got read as
+  belonging to the duck the card was about. What is left there is `PAUSED`, `REDACTION OFF`
+  and `DIRECTOR`, which are warnings and have to be visible somewhere.
 - All seven README screenshots re-rendered. They were made before the android, the
   noodles and the horizon existed, and the overview was still captioned as showing a
   scoreboard on the far deck, which moved onto the screen two releases ago. The hover

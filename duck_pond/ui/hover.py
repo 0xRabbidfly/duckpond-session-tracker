@@ -218,14 +218,15 @@ class DUCKPOND_OT_hover(bpy.types.Operator):
         elif key:
             self._draw_name_tag(region, rv3d, key, now)
         card = cards.card_for(RT.fleet, kind, key, now, RT.redact)
-        footer = cards.totals_line(RT.fleet, now)
-        if RT.paused:
-            footer += "   ·   PAUSED"
-        if not RT.redact:
-            footer += "   ·   REDACTION OFF"
-        if RT.director.enabled:
-            footer += "   ·   DIRECTOR"
-        self._draw_card(context, region, card, footer, key)
+        # The pool-wide totals used to sit down here permanently. They are on the board at
+        # the top of the screen, and a second copy in the corner only ever got read as
+        # belonging to the duck whose card was above it. What is left is the modes, which
+        # are warnings about the pond lying to you and have to be visible somewhere.
+        flags = [f for f, on in (("PAUSED", RT.paused), ("REDACTION OFF", not RT.redact),
+                                 ("DIRECTOR", RT.director.enabled)) if on]
+        footer = "   ·   ".join(flags)
+        if card or footer:
+            self._draw_card(context, region, card, footer, key)
         if RT.show_legend:
             self._draw_legend(context, region)
         self._draw_board(region, now)  # last: the one thing that must never be covered
@@ -249,7 +250,7 @@ class DUCKPOND_OT_hover(bpy.types.Operator):
                 widths.append(blf.dimensions(FONT, card.highlight)[0])
         width = min(max(widths + [260]) + 2 * PAD + 6, region.width - 48)
         rows = len(lines) + (3 if card else 0) + (1 if card and card.highlight else 0) + (1 if card and card.tool_mix else 0)
-        height = rows * LINE_H + LINE_H + 2 * PAD + (TITLE_SIZE + 10 if card else 0)
+        height = rows * LINE_H + (LINE_H if footer else 0) + 2 * PAD + (TITLE_SIZE + 10 if card else 0)
         tools_w = 0
         if context.area:
             for r in context.area.regions:
@@ -319,18 +320,14 @@ class DUCKPOND_OT_hover(bpy.types.Operator):
                 blf.draw(FONT, label)
                 cx += w + 6
             y -= LINE_H
-        # A rule and a dimmer colour separate the pond-wide tally from the card above it: without
-        # them the two read as one block, and the totals look like the selected duck's own numbers.
-        if card:
-            self._rect(x0 + PAD, y + LINE_H - 5, x0 + width - PAD, y + LINE_H - 4, (1.0, 1.0, 1.0, 0.16))
-        scope, _, rest = footer.partition("  ·  ")
-        blf.color(FONT, 0.50, 0.58, 0.68, 1.0)
-        blf.position(FONT, x, y, 0)
-        blf.draw(FONT, scope)
-        if rest:
-            blf.position(FONT, x + blf.dimensions(FONT, scope + "  ·  ")[0], y, 0)
-            blf.color(FONT, 0.6, 0.75, 0.85, 1.0)
-            blf.draw(FONT, rest)
+        if footer:
+            # a rule, so the modes do not read as another line of the card above them
+            if card:
+                self._rect(x0 + PAD, y + LINE_H - 5, x0 + width - PAD, y + LINE_H - 4,
+                           (1.0, 1.0, 1.0, 0.16))
+            blf.color(FONT, 0.85, 0.72, 0.45, 1.0)   # amber: these are all "not the normal pond"
+            blf.position(FONT, x, y, 0)
+            blf.draw(FONT, footer)
 
     # ------------------------------------------------------------ tags
     def _anchor(self, region, rv3d, d, lift: float):

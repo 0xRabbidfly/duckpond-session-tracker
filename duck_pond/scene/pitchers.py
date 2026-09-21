@@ -34,15 +34,24 @@ WALL = 0.016               # glass thickness, so the sangria sits inside the jug
 # pool. They are wider apart than the jugs and overhang the table, because they are signage
 # rather than furniture -- and they are scaled to the camera at the lane signs' own reference
 # distance, so a jug label and a lane sign are exactly the same size on screen.
-LABEL_DX = 1.36
+LABEL_DX = 0.95
 LABEL_DY = -0.22
 LABEL_Z = 1.95
 LABEL_REF_DIST = 15.2
 PLATE_W, PLATE_H = 1.78, 1.00
-LOGO_R = 0.42              # the spinning mark above and between the two labels
-LOGO_RAYS = 11             # a radiating burst; three blades read as a boat propeller
-LOGO_SPIN = 0.55           # radians per second
-LOGO_COLOR = "#D97757"
+PLATE_SCALE = 0.70         # the pair reads from across a room at a third off; they were shouting
+LOGO_R = 0.42              # the mark above and between the two labels
+LOGO_RAYS = 11             # a radiating burst
+# It used to turn, which is not what the Claude mark does when it is thinking: the rays
+# reach out and draw back in, in a wave round the burst. A pulse also survives being small,
+# where a slow rotation just looks like a wobble.
+LOGO_PULSE_HZ = 0.42       # one wave round the burst every two and a half seconds
+LOGO_MIN, LOGO_MAX = 0.42, 1.12   # how far in and out a ray travels, as a fraction of LOGO_R
+LOGO_COLOR = "#E88A66"     # a touch brighter than the clay, to lift off the disc
+LOGO_DISC = "#1A1008"      # it floats against the sky, which is pale by day and black by
+# night, so nothing painted on it alone can contrast with both. A dark disc behind it fixes
+# the background instead, and the mark is then legible at noon and at midnight.
+LOGO_DISC_R = 0.53         # wider than LOGO_R * LOGO_MAX, so a ray never pokes outside
 SANGRIA = "#E00010"        # a saturated red, lit from within so it carries through the glass.
 # Tuned by measuring the rendered pixels, not by eye. The scene renders through AgX, which
 # desaturates bright emission: at 1.6 the fill came out (209,95,93), a coral. This, with a
@@ -75,26 +84,42 @@ def _fill_mesh(mat):
     return b.finish("JugFill", [mat])
 
 
-def _logo_mesh(mat):
-    """A radiating burst, spun slowly over the two labels.
+def _ray_mesh(mat):
+    """One arm of the burst, lying along +X from the origin.
+
+    Its own object, so its length is its `scale.x` and each arm can reach and draw back on
+    its own phase. Scaling X alone leaves the cross-section be, so an arm gets longer without
+    getting fatter.
 
     Drawn from primitives as a nod to the Claude starburst, not the official asset: Duck Pond
     ships no brand files and cannot fetch one offline. Put a real image on a plane here if you
     want the exact mark.
     """
-    me = MS._existing("UsageLogo")
+    me = MS._existing("UsageRay")
     if me:
         return me
     b = MS._Builder()
-    for i in range(LOGO_RAYS):
-        a = 2 * math.pi * i / LOGO_RAYS
-        length = LOGO_R * (1.0 if i % 2 == 0 else 0.72)   # alternating, so it reads as a burst
-        b.cone(0.036, 0.004, length,
-               at=(length / 2 * math.cos(a), length / 2 * math.sin(a), 0.0),
-               rot=Matrix.Rotation(a, 4, "Z") @ Matrix.Rotation(math.radians(90), 4, "Y"),
-               segments=10)
+    b.cone(0.036, 0.004, LOGO_R, at=(LOGO_R / 2, 0.0, 0.0),
+           rot=Matrix.Rotation(math.radians(90), 4, "Y"), segments=10)
+    return b.finish("UsageRay", [mat])
+
+
+def _hub_mesh(mat):
+    me = MS._existing("UsageHub")
+    if me:
+        return me
+    b = MS._Builder()
     b.sphere(0.055, scale=(1.0, 1.0, 0.45))
-    return b.finish("UsageLogo", [mat])
+    return b.finish("UsageHub", [mat])
+
+
+def _disc_mesh(mat):
+    me = MS._existing("UsageDisc")
+    if me:
+        return me
+    b = MS._Builder()
+    b.cylinder(LOGO_DISC_R, 0.012, at=(0.0, 0.0, 0.0), segments=40)
+    return b.finish("UsageDisc", [mat])
 
 
 def _table_mesh(mat):
@@ -160,16 +185,30 @@ class Pitchers:
                                  "head": head, "pct": pct, "sub": sub, "x": x + dx, "y": y}
         # the mark sits between the two labels and above them, on its own screen-aligned root
         logo_root = P.new_object("DP_UsageLogoRoot")
-        logo_root.location = (x, y + LABEL_DY, LABEL_Z + 2.10)  # clear of the plates above them
+        logo_root.location = (x, y + LABEL_DY, LABEL_Z + 1.62)  # clear of the plates below it
         lc = logo_root.constraints.new("COPY_ROTATION")
         lc.target = P.camera()
-        logo = P.new_object("DP_UsageLogo", _logo_mesh(
-            M.flat_material("UsageLogo", LOGO_COLOR, roughness=0.35, emission=0.9)))
-        logo.parent = logo_root
-        for o in (logo_root, logo):
+        disc = P.new_object("DP_UsageDisc", _disc_mesh(
+            M.flat_material("UsageDisc", LOGO_DISC, roughness=0.8)))
+        disc.parent = logo_root
+        disc.location = (0.0, 0.0, -0.03)          # just behind the arms
+        # no rotation: the root already carries the camera's, and a disc built in XY faces
+        # the viewer under it. Turning it as well stood it on edge and it read as a saucer.
+        ray_mat = M.flat_material("UsageLogo", LOGO_COLOR, roughness=0.35, emission=1.15)
+        hub = P.new_object("DP_UsageHub", _hub_mesh(ray_mat))
+        hub.parent = logo_root
+        rays = []
+        for i in range(LOGO_RAYS):
+            a = 2 * math.pi * i / LOGO_RAYS
+            ray = P.new_object(f"DP_UsageRay{i}", _ray_mesh(ray_mat))
+            ray.parent = logo_root
+            ray.rotation_euler = (0.0, 0.0, a)
+            ray.scale = (LOGO_MIN, 1.0, 1.0)
+            rays.append(ray)
+        for o in (logo_root, disc, hub, *rays):
             o["dp_kind"] = "deck"
         self.objects["logo_root"] = logo_root
-        self.objects["logo"] = logo
+        self.objects["rays"] = rays
 
     def update(self, usage) -> None:
         """Pour each jug to its window's fraction and write the reset time under it."""
@@ -213,22 +252,37 @@ class Pitchers:
         if table is None:
             return
         k = max(0.6, min(2.5, (Vector(table.location) - eye).length / LABEL_REF_DIST))
-        roots = [self.objects[key]["root"] for _t, key in WINDOWS if key in self.objects]
-        roots += [self.objects["logo_root"]] if "logo_root" in self.objects else []
-        for root in roots:
+        # the plates and their text ride one root, so a single scale shrinks the container
+        # and everything written on it together
+        sized = [(self.objects[key]["root"], k * PLATE_SCALE) for _t, key in WINDOWS
+                 if key in self.objects]
+        if "logo_root" in self.objects:
+            # the mark shrinks with the plates it belongs to, or it towers over them
+            sized.append((self.objects["logo_root"], k * PLATE_SCALE))
+        for root, s in sized:
             try:
-                if abs(root.scale.x - k) > 1e-4:
-                    root.scale = (k, k, k)
+                if abs(root.scale.x - s) > 1e-4:
+                    root.scale = (s, s, s)
             except ReferenceError:
                 return
 
-    def spin(self, now: float) -> None:
-        """Turn the mark. Its root copies the camera's rotation, so local Z faces the viewer
-        and spinning about it reads as a pinwheel rather than a sign edging away."""
-        logo = self.objects.get("logo")
-        if logo is None:
+    def pulse(self, now: float) -> None:
+        """Reach the arms out and draw them back, one wave running round the burst.
+
+        Each arm is a quarter-turn behind the one before it, so the burst breathes in a
+        rotating wave rather than all at once -- which is what the Claude mark does while it
+        is thinking. The arms' own root copies the camera's rotation, so the whole thing
+        stays face-on however the camera moves.
+        """
+        rays = self.objects.get("rays")
+        if not rays:
             return
+        mid = (LOGO_MAX + LOGO_MIN) / 2
+        half = (LOGO_MAX - LOGO_MIN) / 2
         try:
-            logo.rotation_euler = (0.0, 0.0, (now * LOGO_SPIN) % (2 * math.pi))
+            for i, ray in enumerate(rays):
+                phase = 2 * math.pi * i / LOGO_RAYS
+                s = mid + half * math.sin(now * 2 * math.pi * LOGO_PULSE_HZ - phase)
+                ray.scale = (s, 1.0, 1.0)
         except ReferenceError:
             self.objects = {}
