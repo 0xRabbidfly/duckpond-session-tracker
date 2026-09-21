@@ -10,6 +10,7 @@ import math
 import time
 
 import bpy
+from mathutils import Vector
 
 from . import materials as M
 from . import meshes as MS
@@ -109,7 +110,7 @@ class Sky:
         azim = math.radians(-100 + 200 * frac)
         sun.rotation_euler = (math.pi / 2 - elev, 0.0, azim)
         light = sun.data
-        light.energy = 0.6 + 3.6 * day  # moonlight floor so the pool never goes black
+        light.energy = 1.35 + 2.9 * day  # a generous moonlight floor: night, not a power cut
         warm = 1.0 - day  # low sun is warm
         light.color = (1.0, 0.93 - 0.25 * warm, 0.82 - 0.45 * warm)
 
@@ -122,12 +123,34 @@ class Sky:
         bg = nt.nodes.get("Background")
         if ramp is not None:
             horizon_day = (0.75, 0.85, 0.95)
-            horizon_night = (0.10, 0.12, 0.20)
+            # Night used to be (0.10, 0.12, 0.20) over (0.02, 0.03, 0.07) at 0.45 strength,
+            # which read as "the renderer has failed" rather than as night. It is a moonlit
+            # navy now: bright enough to see the pool, and blue enough that nobody mistakes
+            # it for day. The stars do the rest of the telling.
+            horizon_night = (0.16, 0.20, 0.34)
             zenith_day = (0.30, 0.52, 0.85)
-            zenith_night = (0.02, 0.03, 0.07)
+            zenith_night = (0.05, 0.07, 0.19)
             dusk = math.sin(math.pi * day) ** 2 * (1.0 - day)  # a warm band around sunrise/sunset
             e0, e1 = ramp.color_ramp.elements[0], ramp.color_ramp.elements[1]
             e0.color = tuple(horizon_day[i] * day + horizon_night[i] * (1 - day) + (0.5, 0.2, 0.0)[i] * dusk for i in range(3)) + (1.0,)
             e1.color = tuple(zenith_day[i] * day + zenith_night[i] * (1 - day) for i in range(3)) + (1.0,)
         if bg is not None:
-            bg.inputs["Strength"].default_value = 0.45 + 0.55 * day
+            bg.inputs["Strength"].default_value = 0.72 + 0.28 * day
+        # the three sky layers: stars fade in with night, cloud and the sun disc with day
+        for name, val in (("DP_Day", day), ("DP_Night", 1.0 - day)):
+            n = nt.nodes.get(name)
+            if n is not None:
+                n.outputs[0].default_value = val
+        self._sun_vector(nt)
+
+    @staticmethod
+    def _sun_vector(nt) -> None:
+        """Point the sky's sun disc at the actual lamp, so the two cannot drift apart."""
+        sun = bpy.data.objects.get("DP_Sun")
+        if sun is None:
+            return
+        v = sun.rotation_euler.to_matrix() @ Vector((0.0, 0.0, 1.0))   # a sun lamp shines down -Z
+        for name, comp in (("DP_SunX", v.x), ("DP_SunY", v.y), ("DP_SunZ", v.z)):
+            n = nt.nodes.get(name)
+            if n is not None:
+                n.outputs[0].default_value = comp

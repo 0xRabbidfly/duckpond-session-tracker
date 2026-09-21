@@ -229,6 +229,16 @@ def box_mesh(name: str, sx, sy, sz, mat, at=(0, 0, 0)) -> bpy.types.Mesh:
     return b.finish(name, [mat])
 
 
+def disc_mesh(name: str, r: float, mat, segments: int = 96) -> bpy.types.Mesh:
+    """A flat disc. Used for the lawn, whose far edge is the horizon."""
+    me = _existing(name)
+    if me:
+        return me
+    b = _Builder()
+    b.cylinder(r, 0.01, segments=segments)
+    return b.finish(name, [mat])
+
+
 def grid_mesh(name: str, sx, sy, nx, ny, mat) -> bpy.types.Mesh:
     me = _existing(name)
     if me:

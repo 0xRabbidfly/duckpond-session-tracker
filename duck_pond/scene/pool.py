@@ -16,7 +16,10 @@ POOL_X = 16.0
 POOL_Y = 8.0
 DEPTH = 1.5
 DECK = 2.0
-GRASS_X, GRASS_Y = 90.0, 70.0  # the lawn: big enough to fill the frame at any window shape
+# The lawn is a disc, not an endless plane: its far edge IS the horizon, and the sky
+# (stars at night, cloud and the sun by day) lives above it. Sized so that edge lands
+# partway up the frame rather than past the top of it.
+GRASS_R = 12.5
 WATER_Z = 0.0
 MIN_LANE_W = 2.0
 LANE_MARGIN = 0.9
@@ -114,8 +117,8 @@ def ensure_pool() -> None:
         slab.location = at
 
     # the lawn runs well past the deck so a window wider than the render still lands on grass
-    grass = new_object("DP_Grass", MS.grid_mesh("Grass", GRASS_X, GRASS_Y, 1, 1, M.grass_material()))
-    grass.location = (POOL_X / 2 - GRASS_X / 2, POOL_Y / 2 - GRASS_Y / 2, -0.015)
+    grass = new_object("DP_Grass", MS.disc_mesh("Grass", GRASS_R, M.grass_material()))
+    grass.location = (POOL_X / 2, POOL_Y / 2, -0.015)
     grass["dp_kind"] = "deck"
 
     water = new_object("DP_Water", MS.grid_mesh("Water", POOL_X, POOL_Y, 64, 32, M.water_material()))
@@ -147,13 +150,100 @@ def ensure_pool() -> None:
         coords = nt.nodes.new("ShaderNodeTexCoord")
         sep = nt.nodes.new("ShaderNodeSeparateXYZ")
         nt.links.new(coords.outputs["Generated"], sep.inputs[0])
+        # In a world shader the Generated coordinate is the view direction, so Z is the sine
+        # of the elevation. This camera looks about 30 degrees down and never sees above -10,
+        # so the strip of sky above the lawn's far edge sits at Z around -0.26 to -0.17: all
+        # negative. Ranges written for a Z of 0 to 0.4 clamped the lot to one flat colour.
+        skyt = nt.nodes.new("ShaderNodeMapRange")
+        skyt.inputs["From Min"].default_value = -0.28
+        skyt.inputs["From Max"].default_value = -0.08
+        nt.links.new(sep.outputs["Z"], skyt.inputs["Value"])
         ramp = nt.nodes.new("ShaderNodeValToRGB")
-        ramp.color_ramp.elements[0].position = 0.45
+        ramp.color_ramp.elements[0].position = 0.0
         ramp.color_ramp.elements[0].color = (0.75, 0.85, 0.95, 1.0)
-        ramp.color_ramp.elements[1].position = 0.75
+        ramp.color_ramp.elements[1].position = 0.9
         ramp.color_ramp.elements[1].color = (0.30, 0.52, 0.85, 1.0)
-        nt.links.new(sep.outputs["Z"], ramp.inputs["Fac"])
-        nt.links.new(ramp.outputs["Color"], bg.inputs["Color"])
+        nt.links.new(skyt.outputs["Result"], ramp.inputs["Fac"])
+
+        # Above the sky gradient sit three layers, each faded in by a Value node the clock
+        # drives (see sky._world): stars at night, cloud by day, and a sun disc that tracks
+        # the lamp. Below the horizon they are all masked off -- the lawn covers it anyway,
+        # but a star under the grass is the kind of thing that shows up in a screenshot.
+        day_v = nt.nodes.new("ShaderNodeValue")
+        day_v.name = "DP_Day"
+        night_v = nt.nodes.new("ShaderNodeValue")
+        night_v.name = "DP_Night"
+        sun_x = nt.nodes.new("ShaderNodeValue")
+        sun_x.name = "DP_SunX"
+        sun_y = nt.nodes.new("ShaderNodeValue")
+        sun_y.name = "DP_SunY"
+        sun_z = nt.nodes.new("ShaderNodeValue")
+        sun_z.name = "DP_SunZ"
+
+        # No "above the horizon" mask: the lawn is opaque and covers everything below its own
+        # edge, so the only place this world is visible at all is the sky.
+        def _mul(a_out, b_out):
+            m = nt.nodes.new("ShaderNodeMath")
+            m.operation = "MULTIPLY"
+            nt.links.new(a_out, m.inputs[0])
+            nt.links.new(b_out, m.inputs[1])
+            return m
+
+        # stars: sparse specks from a very fine noise, cut hard so only the peaks survive
+        stars = nt.nodes.new("ShaderNodeTexNoise")
+        stars.inputs["Scale"].default_value = 1500.0   # fine enough that a star is a speck
+        stars.inputs["Detail"].default_value = 0.0
+        nt.links.new(coords.outputs["Generated"], stars.inputs["Vector"])
+        star_cut = nt.nodes.new("ShaderNodeValToRGB")
+        # A hard, high cut: at 0.60 roughly a third of the sky passed and it read as static.
+        star_cut.color_ramp.elements[0].position = 0.715
+        star_cut.color_ramp.elements[1].position = 0.760
+        nt.links.new(stars.outputs["Fac"], star_cut.inputs["Fac"])
+        star_amt = _mul(star_cut.outputs["Color"], night_v.outputs[0])
+
+        # cloud: broad soft noise, only by day
+        cloud = nt.nodes.new("ShaderNodeTexNoise")
+        cloud.inputs["Scale"].default_value = 3.4
+        cloud.inputs["Detail"].default_value = 6.0
+        nt.links.new(coords.outputs["Generated"], cloud.inputs["Vector"])
+        cloud_cut = nt.nodes.new("ShaderNodeValToRGB")
+        # Broken cloud, not overcast: at 0.46 the threshold passed nearly the whole sky and
+        # the day went flat white.
+        cloud_cut.color_ramp.elements[0].position = 0.575
+        cloud_cut.color_ramp.elements[1].position = 0.720
+        nt.links.new(cloud.outputs["Fac"], cloud_cut.inputs["Fac"])
+        cloud_amt = _mul(cloud_cut.outputs["Color"], day_v.outputs[0])
+
+        # the sun itself: how closely this direction points at the lamp
+        sun_vec = nt.nodes.new("ShaderNodeCombineXYZ")
+        for v, sock in ((sun_x, "X"), (sun_y, "Y"), (sun_z, "Z")):
+            nt.links.new(v.outputs[0], sun_vec.inputs[sock])
+        view_n = nt.nodes.new("ShaderNodeVectorMath")
+        view_n.operation = "NORMALIZE"
+        nt.links.new(coords.outputs["Generated"], view_n.inputs[0])
+        dot = nt.nodes.new("ShaderNodeVectorMath")
+        dot.operation = "DOT_PRODUCT"
+        nt.links.new(view_n.outputs["Vector"], dot.inputs[0])
+        nt.links.new(sun_vec.outputs["Vector"], dot.inputs[1])
+        disc = nt.nodes.new("ShaderNodeValToRGB")
+        disc.color_ramp.elements[0].position = 0.986      # a disc, plus a little bloom
+        disc.color_ramp.elements[1].position = 0.9995
+        nt.links.new(dot.outputs["Value"], disc.inputs["Fac"])
+        sun_amt = _mul(disc.outputs["Color"], day_v.outputs[0])
+
+        sky_cloud = nt.nodes.new("ShaderNodeMixRGB")
+        sky_cloud.inputs["Color2"].default_value = (0.95, 0.96, 0.98, 1.0)
+        nt.links.new(cloud_amt.outputs[0], sky_cloud.inputs["Fac"])
+        nt.links.new(ramp.outputs["Color"], sky_cloud.inputs["Color1"])
+        with_stars = nt.nodes.new("ShaderNodeMixRGB")
+        with_stars.inputs["Color2"].default_value = (1.0, 0.98, 0.92, 1.0)
+        nt.links.new(star_amt.outputs[0], with_stars.inputs["Fac"])
+        nt.links.new(sky_cloud.outputs["Color"], with_stars.inputs["Color1"])
+        with_sun = nt.nodes.new("ShaderNodeMixRGB")
+        with_sun.inputs["Color2"].default_value = (1.0, 0.97, 0.86, 1.0)
+        nt.links.new(sun_amt.outputs[0], with_sun.inputs["Fac"])
+        nt.links.new(with_stars.outputs["Color"], with_sun.inputs["Color1"])
+        nt.links.new(with_sun.outputs["Color"], bg.inputs["Color"])
         bg.inputs["Strength"].default_value = 1.0
     scene.world = world
 
