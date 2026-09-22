@@ -65,6 +65,15 @@ All notable changes to Duck Pond are recorded here. The format follows
   far on a fixed line, and ≈$ bars for the range with their peak.
 
 ### Changed
+- **The context ring is banded, not blended, and a full duck's ring has holes in it.** Four
+  bands with the numbers on the key: green to 20 %, yellow to 50 %, red to 80 %, and above
+  that a black ring, punctured -- the ring has stopped floating. A gradient gave every duck
+  its own shade of the same story; what you want from across the room is which band it is
+  in, and a band is a thing the key can put a number on (it now reads `to 20 %`, `to 50 %`,
+  `to 80 %`, `to 100 %`). The card's context meter follows the same bands, so it can no
+  longer disagree with the duck it describes. The red is deeper than the halo's, which is a
+  different sentence: the halo lies on the water and says "blocked", the ring is worn on the
+  neck and says "nearly out of room".
 - The bottom-left corner no longer shows `DIRECTOR`. The auto camera is on by default in
   kiosk mode, so it was a permanent box in the corner naming an internal setting rather than
   warning about anything. `PAUSED` and `REDACTION OFF` stay, because those two do mean the
@@ -148,6 +157,15 @@ All notable changes to Duck Pond are recorded here. The format follows
 - README screenshots live in `docs/media/` so they render on GitHub.
 
 ### Fixed
+- **A session you came back to lost its hat, and with it its context colour.** Leave a
+  session alone long enough and housekeeping ends it and drops it; the next line it writes
+  rebuilds it from `SessionSeen`, which carried no model. `ModelChanged` only fires on a
+  change, and the adapter's parser had not forgotten the model, so it never said it again:
+  the duck wore the unknown-model hat for the rest of its life and was measured against the
+  200K default window, which pinned a 1M session 70 % full at `full`. `SessionSeen` now
+  carries what the parser already knows (model and last context reading), every `Usage`
+  event adopts its model when the agent has none, and a sub-agent that reports its own model
+  after inheriting its parent's gets its window recomputed with it.
 - Procedural meshes took their neighbour's material at every primitive boundary. The
   builder tagged each new primitive as `faces[n:]` after building it, and bmesh gives no
   promise that a new face lands at the end of the array: on a cone followed by a sphere,

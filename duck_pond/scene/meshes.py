@@ -99,6 +99,37 @@ class _Builder:
                 bm.faces.new((v1, v2, v3, v4))
         self._assign(m, slot)
 
+    def torus_arcs(self, R, r, arcs=6, duty=0.62, at=(0, 0, 0), slot=0, seg_major=6, seg_minor=10):
+        """A torus with `arcs` pieces of it left out: a ring with holes bitten through it.
+
+        Holes drilled into the tube disappear at pool distance, where the whole ring is a few
+        pixels across; gaps that go right through the tube still read as holes from there.
+        """
+        m = self._mark()
+        bm = self.bm
+        step = 2 * math.pi / arcs
+        span = step * duty
+        for k in range(arcs):
+            a0 = step * k
+            rings = []
+            for i in range(seg_major + 1):
+                a = a0 + span * i / seg_major
+                row = []
+                for j in range(seg_minor):
+                    b = 2 * math.pi * j / seg_minor
+                    x = (R + r * math.cos(b)) * math.cos(a) + at[0]
+                    y = (R + r * math.cos(b)) * math.sin(a) + at[1]
+                    z = r * math.sin(b) + at[2]
+                    row.append(bm.verts.new((x, y, z)))
+                rings.append(row)
+            for i in range(seg_major):
+                for j in range(seg_minor):
+                    bm.faces.new((rings[i][j], rings[i + 1][j],
+                                  rings[i + 1][(j + 1) % seg_minor], rings[i][(j + 1) % seg_minor]))
+            bm.faces.new(list(reversed(rings[0])))  # cap the cut ends, or the holes look hollow
+            bm.faces.new(rings[-1])
+        self._assign(m, slot)
+
     def annulus(self, r_in, r_out, segments=48, slot=0):
         m = self._mark()
         bm = self.bm
@@ -228,6 +259,20 @@ def lifering_mesh(mat) -> bpy.types.Mesh:
     b = _Builder()
     b.torus(0.224, 0.045, slot=0)
     return b.finish("LifeRing", [mat])
+
+
+def lifering_holed_mesh(mat) -> bpy.types.Mesh:
+    """The ring a duck wears once its context is full: the same ring, punctured.
+
+    Same radius and tube as the whole one so the swap is invisible except for the holes,
+    which is the point -- it is the same ring, gone.
+    """
+    me = _existing("LifeRingHoled")
+    if me:
+        return me
+    b = _Builder()
+    b.torus_arcs(0.224, 0.045, arcs=7, duty=0.74, slot=0)
+    return b.finish("LifeRingHoled", [mat])
 
 
 def box_mesh(name: str, sx, sy, sz, mat, at=(0, 0, 0)) -> bpy.types.Mesh:

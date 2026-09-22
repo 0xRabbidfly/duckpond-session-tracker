@@ -327,6 +327,11 @@ class Fleet:
         if ev.get("model"):
             s.model = ev["model"]
             s.context_window = context_window_for(s.model)
+        # A session rebuilt after housekeeping dropped it knows nothing about how full it was,
+        # and the gauge would read empty until its next reply. The adapter hands us what it
+        # last saw; only a session with no readings of its own takes it.
+        if ev.get("context_used") and not s.context_used:
+            s.context_used = int(ev["context_used"])
         if ev.get("title"):
             s.set_title(ev["title"], ev.get("title_source", "custom"))
         if ev.get("permission_mode"):
@@ -408,6 +413,12 @@ class Fleet:
             "cache_read": int(ev.get("cache_read") or 0), "tokens_out": int(ev.get("tokens_out") or 0),
             "speed": ev.get("speed") or "", "usd": usd,
         })
+        if ev.get("model") and not a.model:
+            # Every reply names its model, so nothing that has spoken should be wearing the
+            # unknown-model hat -- or be measured against the default window.
+            a.model = ev["model"]
+            a.context_window = context_window_for(a.model)
+            self.cues.append(Cue("hat", sid, ev.get("agent_id", "")))
         a.tokens_in += int(ev.get("tokens_in") or 0)
         a.tokens_out += int(ev.get("tokens_out") or 0)
         if ev.get("context_used") is not None:
@@ -513,6 +524,7 @@ class Fleet:
         sub.description = ev.get("description", sub.description) or sub.description
         if ev.get("model"):
             sub.model = ev["model"]
+            sub.context_window = context_window_for(sub.model)  # it may have been the parent's
         if ev.get("background"):
             sub.background = True
         if ev.get("parent_agent_id"):

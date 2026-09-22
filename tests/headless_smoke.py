@@ -110,6 +110,13 @@ check(_near_bill > 0.15, f"the ring clears the bill by {_near_bill:.3f} (level a
 check(min(p.z for p in _pts) < 0.0 < max(p.z for p in _pts),
       f"it slopes from above the neck into the water (z {min(p.z for p in _pts):+.3f}..{max(p.z for p in _pts):+.3f})")
 check(_th > 0.3, f"and it is tilted, not level ({math.degrees(_th):.0f} deg)")
+# the four context bands: opus is 91 % full, so its ring is the punctured one and it is black
+_op_frac = RT.fleet.sessions["cc-opus-2"].context_frac
+check(_op_frac > 0.8 and _ring.data.name == "DP_LifeRingHoled" and max(_ring.color[:3]) < 0.05,
+      f"a duck over 80 % wears a black ring with holes in it ({_op_frac:.2f}, {_ring.data.name})")
+_fab = obj("DP_Duck_cc-fable-1_ring")
+check(RT.fleet.sessions["cc-fable-1"].context_frac <= 0.8 and _fab.data.name == "DP_LifeRing"
+      and max(_fab.color[:3]) > 0.4, f"a duck under 80 % wears a whole, coloured one ({_fab.data.name})")
 # the bather waves when a duck has put a question to you, not when a turn merely ended
 _asking = [s for s in RT.fleet.live_sessions() if s.blocked_on_you()]
 check(bool(_asking) == RT.blocked_on_you,

@@ -51,18 +51,23 @@ HAT_COLORS = {
     "newspaper": "#E8E4D8",
 }
 
-# The ring around a duck's neck is its context gauge: always on, colour only. Green -> yellow
-# -> magenta, picked to clear two things it sits next to: the duck's own salmon body (so the
-# ring never blends into it) and the state halo's teal/amber/red (so a full duck and a blocked
-# duck can never be confused at a glance).
-CONTEXT_RAMP = [
-    (0.00, "#22C55E"),
-    (0.45, "#FFE14D"),
-    (0.75, "#FF7A1A"),
-    (1.00, "#FF2FD0"),
+# The ring around a duck's neck is its context gauge: always on, colour only, and stepped
+# rather than blended. A gradient gave every duck its own shade of the same story; what you
+# want from across the room is which of four bands it is in, and a band you can name is a
+# band the key can put a number on.
+#
+# (upper bound inclusive, colour, label). The top band is not a colour at all: a full duck
+# wears a black ring with holes bitten out of it -- a ring that has stopped floating. The
+# red below it is deeper than the halo's #FF3B30 on purpose: the halo lies on the water and
+# says "blocked", the ring is worn on the neck and says "nearly out of room".
+CONTEXT_BANDS = [
+    (0.20, "#22C55E", "empty"),
+    (0.50, "#FFE14D", "half"),
+    (0.80, "#DC2626", "filling"),
+    (1.00, "#0D0D0D", "full"),
 ]
-# (fraction, label) for the on-screen key
-CONTEXT_LEGEND = [(0.0, "empty"), (0.45, "half"), (0.75, "filling"), (1.0, "full")]
+# (fraction, label) for the on-screen key: each band's top, which is the number the key shows
+CONTEXT_LEGEND = [(hi, label) for hi, _hex, label in CONTEXT_BANDS]
 
 
 def folder_name(cwd: str, limit: int = 0) -> str:
@@ -87,9 +92,24 @@ def ramp_color(ramp, frac: float) -> tuple[float, float, float, float]:
     return hex_to_rgba(ramp[-1][1])
 
 
+def context_band(frac: float) -> int:
+    """Which CONTEXT_BANDS band a context fill of `frac` falls in. Bounds are inclusive:
+    20 % is still empty, 20.1 % is half."""
+    f = max(0.0, min(1.0, frac))
+    for i, (hi, _hex, _label) in enumerate(CONTEXT_BANDS):
+        if f <= hi + 1e-9:
+            return i
+    return len(CONTEXT_BANDS) - 1
+
+
 def context_ring_color(frac: float) -> tuple[float, float, float, float]:
-    """Colour for a context fill of `frac`, interpolated along CONTEXT_RAMP."""
-    return ramp_color(CONTEXT_RAMP, frac)
+    """Colour for a context fill of `frac`: its band's colour, with no blending between bands."""
+    return hex_to_rgba(CONTEXT_BANDS[context_band(frac)][1])
+
+
+def context_ring_holed(frac: float) -> bool:
+    """True in the top band, where the ring is drawn punctured rather than merely coloured."""
+    return context_band(frac) == len(CONTEXT_BANDS) - 1
 
 
 # The deck mosaic: how busy one project was in one hour, as a fraction of the busiest cell.

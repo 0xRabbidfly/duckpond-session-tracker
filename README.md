@@ -17,8 +17,8 @@ flashing = blocked on a permission, no light and a greyed-out duck = idle. A key
 (`H`) spells out halo, body colour and hat. Your prompts fall from the sky as amber orbs;
 finished reports rise as gold ones. Every tool call pops a coloured **chip** naming it in a
 word (`bash`, `edit`, `read`, `web`, `test`, `spawn`). Context compaction is a geyser. Errors
-bring rain. The ring round a duck's neck is its **context meter**, green when the window is
-empty and magenta when it is full. The sun follows your clock; after dark the lido lights come
+bring rain. The ring round a duck's neck is its **context meter**, in four bands: green to
+20 %, yellow to 50 %, red to 80 %, and past that a black ring with holes bitten out of it. The sun follows your clock; after dark the lido lights come
 on and the ducks glow. A **board** across the top of the screen carries the live count and the
 spend; each lane sign on the west deck carries branches, sessions and that folder's spend; and
 two **jugs of sangria** on the far deck fill with your Anthropic 5-hour and 7-day usage.
@@ -116,7 +116,8 @@ clock override to preview the night lido.
 | gold ring, then the duck fades out within a minute | a headless run (`claude -p` / Agent SDK) finished; it never waits for you |
 | `denied` chip, red ring, head-shake | you rejected its tool call |
 | amber letters stacked on the tail | prompts you typed that are queued behind this turn |
-| the ring round its neck, green → yellow → orange → magenta | how full its context window is |
+| the ring round its neck: green ≤ 20 %, yellow ≤ 50 %, red ≤ 80 % | how full its context window is |
+| that ring gone black with holes in it | over 80 %: the ring has stopped floating |
 | duck sitting low in the water | the same thing again: a full context rides low |
 | geyser + `compacted` chip, duck pops up | context compaction |
 | nose down, sitting a little lower | idle |

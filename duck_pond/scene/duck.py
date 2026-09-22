@@ -6,7 +6,7 @@ import math
 import bpy
 from mathutils import Vector
 
-from ..theme import HAT_COLORS, context_ring_color, harness_color, hat_for_model
+from ..theme import HAT_COLORS, context_ring_color, context_ring_holed, harness_color, hat_for_model
 from . import materials as M
 from . import meshes as MS
 from . import pool as P
@@ -122,8 +122,12 @@ class DuckObj:
         self.halo_color = (0.5, 0.5, 0.5, 0.0)
         # The ring is the context gauge: always worn, and its colour is how full the context is.
         # A ring that only appeared at 95 % told you nothing for the first 94 %.
-        self.lifering = P.new_object(f"{name}_ring", MS.lifering_mesh(
-            M.object_color_material("ContextRing", roughness=0.3, emission=0.25, alpha_from_object=False)))
+        # Both rings are built up front (the mesh is cached per name, so only the first duck
+        # pays for them): swapping the data is then the whole of going full, and no mesh is
+        # created from the frame handler.
+        ring_mat = M.object_color_material("ContextRing", roughness=0.3, emission=0.25, alpha_from_object=False)
+        self.ring_meshes = (MS.lifering_mesh(ring_mat), MS.lifering_holed_mesh(ring_mat))
+        self.lifering = P.new_object(f"{name}_ring", self.ring_meshes[0])
         self.lifering.parent = self.obj
         # Worn the way a person wears one: high at the back of the neck, sloping down over the
         # chest and dipping into the water at the front. Level at the neck it cut straight
@@ -134,6 +138,7 @@ class DuckObj:
         self.lifering["dp_session_id"] = session_id
         self.lifering["dp_agent_id"] = agent_id
         self.ring_color = None
+        self.ring_holed = False
         self.obj["dp_glow"] = 0.0
         # beacon: a pole with a light on top that comes on when the duck needs you. Legible
         # from across the room, which the "?" glyph alone was not.
@@ -264,11 +269,16 @@ class DuckObj:
             self.halo.color = color
 
     def set_context(self, frac: float) -> None:
-        """Colour the ring for a context fill of `frac` (0..1)."""
+        """Dress the ring for a context fill of `frac` (0..1): its band's colour, and in the
+        top band the punctured ring instead of the whole one."""
         col = context_ring_color(frac)
         if col != self.ring_color:
             self.ring_color = col
             self.lifering.color = col
+        holed = context_ring_holed(frac)
+        if holed != self.ring_holed:
+            self.ring_holed = holed
+            self.lifering.data = self.ring_meshes[1 if holed else 0]
 
     # ------------------------------------------------------------ transform
     def place(self, x: float, y: float, z: float, heading: float, pitch: float, roll: float, scale_mul: float = 1.0) -> None:

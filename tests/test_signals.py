@@ -229,6 +229,60 @@ def test_nested_and_background_subagents():
     assert any("in background" in ln for ln in line)
 
 
+def test_quiet_session_comes_back_with_its_model():
+    """A session you leave alone is dropped and rebuilt from the next line it writes.
+
+    It used to come back bare-headed: SessionSeen carried no model, and ModelChanged only
+    fires on a change, so the parser -- which had not forgotten -- never said it again. The
+    duck then wore the unknown-model hat for the rest of its life and, worse, was measured
+    against the 200K default: a 1M session 70 % full showed a ring pinned at 'full'.
+    """
+    import json
+    import tempfile
+
+    from duck_pond.adapters.claude_code import SEEN_REFRESH_S, ClaudeCodeAdapter
+    from duck_pond.theme import context_ring_color, hat_for_model
+
+    def reply(ts, used):
+        return json.dumps({
+            "type": "assistant", "sessionId": "q1", "cwd": "/p", "gitBranch": "main", "timestamp": ts,
+            "message": {"id": "m" + ts, "role": "assistant", "model": "claude-opus-5", "stop_reason": None,
+                        "content": [{"type": "text", "text": "hi"}],
+                        "usage": {"input_tokens": 2, "cache_read_input_tokens": used, "output_tokens": 10}}}) + "\n"
+
+    with tempfile.TemporaryDirectory() as d:
+        proj = os.path.join(d, "C--p")
+        os.makedirs(proj)
+        path = os.path.join(proj, "q1.jsonl")
+        with open(path, "w", encoding="utf-8") as fh:
+            fh.write(reply("2026-09-22T10:00:00Z", 700_000))
+        a = ClaudeCodeAdapter(d, replay_all=True)
+        f = Fleet()
+        for ev in a.poll(T):
+            f.apply(ev)
+        s = f.sessions["q1"]
+        assert s.model == "claude-opus-5" and s.context_window == 1_000_000
+        assert round(s.context_frac, 2) == 0.70, s.context_frac
+
+        # nobody types for a while: the fleet ends it and then drops it
+        quiet = s.last_event_at + 1801  # the transcript's own clock, not the test's
+        f.housekeeping(quiet, idle_after=180, end_after=1800, remove_after=60)
+        f.housekeeping(quiet + 61, idle_after=180, end_after=1800, remove_after=60)
+        assert "q1" not in f.sessions, "a quiet session leaves the pool"
+
+        # ... and then they come back to it
+        with open(path, "a", encoding="utf-8") as fh:
+            fh.write(reply("2026-09-22T12:00:00Z", 710_000))
+        for ev in a.poll(T + SEEN_REFRESH_S + 1):
+            f.apply(ev)
+        s = f.sessions["q1"]
+        assert s.model == "claude-opus-5", f"it came back bare-headed: {s.model!r}"
+        assert hat_for_model(s.model) == "top_hat"
+        assert s.context_window == 1_000_000, s.context_window
+        assert round(s.context_frac, 2) == 0.71, s.context_frac
+        assert context_ring_color(s.context_frac) == context_ring_color(0.71), "and its ring is coloured for 71 %"
+
+
 if __name__ == "__main__":
     failures = 0
     for name, fn in list(globals().items()):

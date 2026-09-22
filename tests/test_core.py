@@ -13,10 +13,13 @@ from duck_pond.adapters.claude_code import ClaudeCodeAdapter  # noqa: E402
 from duck_pond.adapters.stub import StubAdapter  # noqa: E402
 from duck_pond.model import Fleet, context_window_for, model_version  # noqa: E402
 from duck_pond.theme import (  # noqa: E402
+    CONTEXT_BANDS,
     CONTEXT_LEGEND,
-    CONTEXT_RAMP,
+    context_band,
     context_ring_color,
+    context_ring_holed,
     hat_for_model,
+    hex_to_rgba,
     redact,
 )
 
@@ -179,20 +182,29 @@ def test_session_title_precedence():
     assert s.display_name == "forgeai"
 
 
-def test_context_ring_ramp():
-    """The ring is the only thing showing context now, so its ramp has to be total and ordered."""
-    stops = [f for f, _ in CONTEXT_RAMP]
-    assert stops == sorted(stops) and stops[0] == 0.0 and stops[-1] == 1.0, stops
+def test_context_ring_bands():
+    """The ring is the only thing showing context, and it is banded: a duck is in one band or
+    the next, with nothing in between, so the key can put a number on each change."""
+    tops = [hi for hi, _c, _l in CONTEXT_BANDS]
+    assert tops == sorted(tops) and tops[-1] == 1.0, tops
     assert context_ring_color(0.0) == context_ring_color(-5.0), "clamps below zero"
     assert context_ring_color(1.0) == context_ring_color(9.9), "clamps above one"
+    # the bands the user reads off the key: empty to 20, half to 50, red to 80, full to 100
+    assert [context_band(f) for f in (0.0, 0.2, 0.21, 0.5, 0.51, 0.8, 0.81, 1.0)] == [0, 0, 1, 1, 2, 2, 3, 3]
     for f in (0.0, 0.1, 0.45, 0.6, 0.75, 0.9, 1.0):
         rgba = context_ring_color(f)
         assert len(rgba) == 4 and all(0.0 <= c <= 1.0 for c in rgba), (f, rgba)
-    # it has to actually move: an empty duck and a full one must not look the same
-    assert context_ring_color(0.0)[:3] != context_ring_color(1.0)[:3]
-    # every legend swatch names a real point on the ramp
+    # no blending inside a band, and a step at every boundary
+    assert context_ring_color(0.01) == context_ring_color(0.2)
+    for hi in tops[:-1]:
+        assert context_ring_color(hi) != context_ring_color(hi + 0.01), hi
+    # the top band is the punctured ring, and it is the only one
+    assert [context_ring_holed(f) for f in (0.0, 0.5, 0.8, 0.81, 1.0)] == [False, False, False, True, True]
+    assert context_ring_color(1.0)[:3] == hex_to_rgba("#0D0D0D")[:3], "full is black, not a colour"
+    # every legend swatch names a real band
     for f, label in CONTEXT_LEGEND:
         assert 0.0 <= f <= 1.0 and label, (f, label)
+    assert [label for _f, label in CONTEXT_LEGEND] == [lb for _hi, _c, lb in CONTEXT_BANDS]
 
 
 def test_context_window_per_model():

@@ -132,7 +132,10 @@ The duck's behaviour is a small state machine driven by the adapter.
 
 **Context fill:** the duck's Z offset is `-0.12 m × (context_used / context_window)`, so a
 session at 90 % context is visibly sitting low in the water. It also wears a **context ring**
-round its neck at all times, coloured green → yellow → orange → magenta as the window fills.
+round its neck at all times, in four bands rather than a gradient: green to 20 %, yellow to
+50 %, red to 80 %, and above that a black ring with holes bitten out of it -- a ring that has
+stopped floating. Bands, not a blend, because what you want across the room is which band a
+duck is in, and a band is a thing the key can put a number on.
 The ring used to appear only at ≥ 95 %, which said nothing for the first 94 %. It hangs the way
 a person wears one, high behind the neck and dipping into the water at the chest, because level
 at the neck it cut straight across the duck's face.

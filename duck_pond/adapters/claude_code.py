@@ -110,6 +110,7 @@ class _TranscriptParser:
         self.sid = session_id
         self.aid = agent_id
         self.model = ""
+        self.context_used = 0
         self.open_tools: dict[str, dict] = {}  # tool_use_id -> {name, input}
         self.agent_tool_uses: dict[str, dict] = {}  # tool_use_id -> Agent input
         self.last_at = 0.0
@@ -129,7 +130,9 @@ class _TranscriptParser:
                 self.model = model
                 ev.append({"type": "ModelChanged", "model": model, **base})
             if isinstance(msg.get("usage"), dict):
-                ev.append(_usage_event(self.sid, self.aid, msg["usage"], at, model, _reply_key(o, msg)))
+                u = _usage_event(self.sid, self.aid, msg["usage"], at, model, _reply_key(o, msg))
+                self.context_used = int(u["context_used"])  # last reply wins: a compaction lowers it
+                ev.append(u)
             if o.get("effort") and o.get("effort") != self.effort:
                 self.effort = str(o["effort"])
                 ev.append({"type": "Effort", "effort": self.effort, **base})
@@ -358,6 +361,12 @@ class ClaudeCodeAdapter(Adapter):
                         "type": "SessionSeen", "session_id": sid, "harness": HARNESS,
                         "cwd": o.get("cwd", ""), "branch": o.get("gitBranch", ""),
                         "started_at": _ts(o, now), "at": _ts(o, now), "transcript_path": path,
+                        # What we already know about this session, for the refresh emit: a
+                        # session that went quiet was dropped by housekeeping, and this event
+                        # builds it again. Without these it comes back bare-headed and
+                        # measured against the default window, because ModelChanged only
+                        # fires on a change and this parser has not forgotten the model.
+                        "model": parser.model, "context_used": parser.context_used,
                         # claude -p / Agent SDK: a one-shot run (often a scheduled job) nobody answers
                         "headless": o.get("entrypoint") == "sdk-cli",
                     })

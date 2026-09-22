@@ -29,6 +29,7 @@ from ..theme import (
     HAT_COLORS,
     HAT_LEGEND,
     context_ring_color,
+    context_ring_holed,
     harness_color,
     hex_to_rgba,
 )
@@ -290,8 +291,14 @@ class DUCKPOND_OT_hover(bpy.types.Operator):
                 bar_w = width - 2 * PAD - 6
                 self._rect(x, y + 3, x + bar_w, y + 9, (1.0, 1.0, 1.0, 0.12))
                 frac = max(0.0, min(1.0, card.context_frac))
-                col = (0.37, 0.92, 0.83, 0.95) if frac < 0.7 else (1.0, 0.7, 0.3, 0.95) if frac < 0.9 else (1.0, 0.25, 0.2, 0.95)
-                self._rect(x, y + 3, x + bar_w * frac, y + 9, col)
+                # the same four bands the ring wears, so the card never disagrees with the duck
+                rc = context_ring_color(frac)
+                self._rect(x, y + 3, x + bar_w * frac, y + 9, (rc[0], rc[1], rc[2], 0.95))
+                if context_ring_holed(frac):  # black on a dark card: outline it, and punch the holes
+                    self._rect(x, y + 3, x + bar_w * frac, y + 4, (0.8, 0.82, 0.86, 0.9))
+                    self._rect(x, y + 8, x + bar_w * frac, y + 9, (0.8, 0.82, 0.86, 0.9))
+                    for i in range(1, 7):
+                        self._circle(x + bar_w * frac * i / 7.0, y + 6, 1.6, (0.8, 0.82, 0.86, 0.9))
                 blf.size(FONT, 11)
                 blf.color(FONT, 0.8, 0.85, 0.9, 1.0)
                 blf.position(FONT, x, y - 7, 0)
@@ -537,7 +544,7 @@ class DUCKPOND_OT_hover(bpy.types.Operator):
             ("ring", None if st == "idle" else cards.state_rgba(st), word, "")
             for st, word in LEGEND_STATES]))
         cols.append(("RING = CONTEXT", [
-            ("swatch", context_ring_color(f), label, "")
+            ("holed" if context_ring_holed(f) else "swatch", context_ring_color(f), label, f"to {int(f * 100)} %")
             for f, label in CONTEXT_LEGEND]))
         cols.append(("BODY = TOOL", [
             ("swatch", harness_color(h, RT.color_overrides), label, "")
@@ -585,9 +592,12 @@ class DUCKPOND_OT_hover(bpy.types.Operator):
                         self._circle(cx, cy, 6, (0.6, 0.63, 0.7, 0.9), filled=False)
                     else:
                         self._circle(cx, cy, 6, (rgba[0], rgba[1], rgba[2], 1.0))
-                elif kind == "swatch":
+                elif kind in ("swatch", "holed"):
                     self._rect(cx - 7, cy - 6, cx + 7, cy + 6, (0.8, 0.82, 0.86, 0.9))
                     self._rect(cx - 6, cy - 5, cx + 6, cy + 5, (rgba[0], rgba[1], rgba[2], 1.0))
+                    if kind == "holed":  # the key wears the same holes the ring does
+                        for hx, hy in ((-3, 2), (2, 3), (0, -2), (4, -3)):
+                            self._circle(cx + hx, cy + hy, 1.4, (0.8, 0.82, 0.86, 0.9))
                 else:
                     self._hat_glyph(kind.split(":", 1)[1], cx, cy, (rgba[0], rgba[1], rgba[2], 1.0))
                 blf.color(FONT, 0.94, 0.94, 0.94, 1.0)
