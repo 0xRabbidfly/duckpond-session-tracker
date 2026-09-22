@@ -7,7 +7,7 @@ from __future__ import annotations
 import bpy
 from mathutils import Vector
 
-from ..theme import STATE_COLORS, hex_to_rgba, redact
+from ..theme import STATE_COLORS, folder_name, hex_to_rgba, redact
 from . import materials as M
 from . import meshes as MS
 from . import pool as P
@@ -127,8 +127,7 @@ class LaneSigns:
             live = [s for s in sessions if s.state != "ended"]
             branches = sorted({s.branch for s in live if s.branch})
             cost = fleet.ledger.cwd_month_usd(key, now)  # month to date, including ducks that left
-            folder = key.replace("\\", "/").rstrip("/").split("/")[-1] or key
-            _set_body(d["name"], folder if len(folder) <= SIGN_NAME_CHARS else folder[:SIGN_NAME_CHARS - 1] + "…")
+            _set_body(d["name"], folder_name(key, SIGN_NAME_CHARS))
             detail = f"{len(live)} session{'s' if len(live) != 1 else ''} · ≈${cost:.0f}"
             branch = (" · ".join(branches[:2]) + (" +" if len(branches) > 2 else "")) if branches else ""
             room = SIGN_SUB_CHARS - len(detail) - 3  # sessions and spend first; the branch gets what is left

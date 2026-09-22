@@ -108,6 +108,11 @@ def _fit():
 def _shoot():
     if time.time() - T_START < AT + 1.0:
         return 0.25
+    if "__sampled__" not in RT.fleet.ledger._cwd_usd:
+        # a day of spend for the mosaic, against the lanes the fixture has made by now
+        RT.fleet.ledger.sample_history(time.time(), list(RT.lanes.keys), usd_scale=1.6)
+        RT.fleet.ledger._cwd_usd["__sampled__"] = {}
+        RT.tick(time.time())
     if PLANE is not None:
         from duck_pond.scene import plane as plane_mod
         cross = (plane_mod.X1 - plane_mod.X0) / plane_mod.SPEED

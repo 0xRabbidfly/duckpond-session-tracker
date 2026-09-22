@@ -25,6 +25,7 @@ from .scene.bather import Bather
 from .scene.deck import LaneSigns
 from .scene.duck import DuckObj
 from .scene.fx import FX
+from .scene.mosaic import DeckMosaic
 from .scene.pitchers import Pitchers
 from .scene.plane import BannerPlane
 from .scene.props import PoolProps
@@ -34,6 +35,7 @@ from .scene.tether import PacketSystem, Tether
 from .sim.director import Director
 from .sim.motion import Motion
 from .theme import harness_color
+from .ui import cards
 from .usage_limits import UsageLimits
 
 POLL_INTERVAL = 0.25
@@ -66,6 +68,7 @@ class Runtime:
         self.pitchers = Pitchers()
         self.bather = Bather()
         self.plane = BannerPlane()  # tows your Claude Code version across the sky
+        self.mosaic = DeckMosaic()  # which project spent what, and when, in the near paving
         self.director = Director()
         self.limits = UsageLimits()  # the sangria jugs: your 5-hour and 7-day windows
         self.versions = CliVersions()  # the banner plane: yours vs the published CLI
@@ -114,6 +117,7 @@ class Runtime:
         self.pitchers.ensure()
         self.bather.ensure()
         self.plane.ensure()
+        self.mosaic.ensure()
         self.packets.redact_enabled = self.redact
         self.running = True
         self.paused = False
@@ -171,6 +175,7 @@ class Runtime:
         self.pitchers = Pitchers()
         self.bather = Bather()
         self.plane = BannerPlane()
+        self.mosaic = DeckMosaic()
         self.director = Director()
         self.fleet = Fleet()
         coll = bpy.data.collections.get(P.COLL_NAME)
@@ -312,6 +317,11 @@ class Runtime:
         self.sky.tick(self.fleet, now)
         self.signs.update(self.lanes, self.fleet, now, self.redact)
         self.pitchers.update(self.limits.snapshot())
+        # the mosaic follows the board's range, so one key cycles the whole pool's history.
+        # Rows run far lane first, which is the order the lane signs read down the screen:
+        # the assignment order they arrive in is the reverse of it.
+        rows = sorted(self.lanes.keys, key=lambda k: -self.lanes.y_range(k)[0])
+        self.mosaic.update(cards.heat_model(self.fleet, now, self.board_range, keys=rows))
 
     def _duck_pos(self, key: Key):
         d = self.ducks.get(key)

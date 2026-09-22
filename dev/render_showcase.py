@@ -98,6 +98,10 @@ def frame_camera_on(key, back=None):
 # 1. the busy moment: chips, nested duckling, packets, the codex test just failed
 simulate_until(9.7)
 P.camera_overview()
+# a day of spend for the deck mosaic, against the pool's own lanes: the fixture replays in
+# under a minute, so on its own the mosaic is one bright column and twenty-three empty ones
+RT.fleet.ledger.sample_history(time.time(), list(RT.lanes.keys), usd_scale=1.6)
+RT.tick(t0 + _t)
 fly_the_plane(0.3)
 render("showcase_busy.png")
 

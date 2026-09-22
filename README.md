@@ -22,6 +22,8 @@ empty and magenta when it is full. The sun follows your clock; after dark the li
 on and the ducks glow. A **board** across the top of the screen carries the live count and the
 spend; each lane sign on the west deck carries branches, sessions and that folder's spend; and
 two **jugs of sangria** on the far deck fill with your Anthropic 5-hour and 7-day usage.
+A **mosaic** set into the near paving gives one row per project and one tile per hour, so you
+can see which folder spent what, and when, without reading a log.
 Every couple of minutes a propeller plane tows a banner across the sky with the published
 Claude Code version over the one you are running. An android sits on the edge with her
 feet in the water; she puts a hand up when a duck is stopped waiting on an answer from
@@ -126,6 +128,7 @@ clock override to preview the night lido.
 | dark water, lido lamps, glowing ducks | it is after 20:30 on your clock |
 | a flamingo float, a beach ball, a lily pad drifting at the edge | nothing at all; the pool is a place, not only a chart |
 | a plane towing a banner across the sky | the published Claude Code version, over yours; `UPDATE` if you are behind |
+| a bright tile in the deck mosaic | that project spent that much in that hour; the row is the lane above it |
 
 ![Compaction: the geyser goes up, the duck pops up with it](docs/media/compaction.jpg)
 
@@ -225,9 +228,11 @@ duck_pond/
   usage_limits.py    the 5-hour and 7-day limits, read from `claude -p /usage` on its own thread
   herdr.py           click a duck to raise its terminal in Herdr (pane lookup by session id)
   cli_version.py     yours vs the published CLI, for the banner the plane tows
+  ledger.py          every reply's tokens, priced, in per-minute buckets; per folder too
   scene/             pool (water, tiled deck, lawn), duck (beacon, context ring, mail, glow),
                      tether, ripples, fx (chips, orbs, geyser, rain), deck (lane signs),
                      pitchers (the sangria jugs), plane (the version banner),
+                     mosaic (the deck's per-project history),
                      props (floating toys), sky (sun, night, chop, rain)
   sim/motion.py      per-frame motion: contract, personality, separation, body language
   sim/director.py    camera: eases to the duck you pinned, critically damped; never roams
@@ -239,7 +244,7 @@ duck_pond/
 launcher/            DuckPond.exe source (finds Blender, unpacks the add-on, starts the pool) + icon
 fixtures/demo.json   scripted demo: fan-out, nested + background agents, question, denial, compaction
 dev/                 launch.py|cmd, build_exe.py, render_showcase.py, gui_shot.py, render_icon.py
-tests/               core, signals, ledger, usage, herdr, cli version,
+tests/               core, signals, ledger, usage, herdr, cli version, mosaic,
                      headless motion / smoke / director / watchdog
 docs/                ARCHITECTURE.md, media/
 ```

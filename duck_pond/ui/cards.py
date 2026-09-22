@@ -12,7 +12,15 @@ from dataclasses import dataclass, field
 
 from ..ledger import RANGE_ORDER, RANGES, fmt_stats, fmt_usd
 from ..model import Fleet, Session, SubAgent
-from ..theme import HARNESS_LABELS, STATE_COLORS, hex_to_rgba, model_label, redact, tool_chip
+from ..theme import (
+    HARNESS_LABELS,
+    STATE_COLORS,
+    folder_name,
+    hex_to_rgba,
+    model_label,
+    redact,
+    tool_chip,
+)
 
 STATE_LABELS = {
     "generating": "generating",
@@ -312,3 +320,83 @@ def totals_line(fleet: Fleet, now: float) -> str:
     return (f"{TOTALS_SCOPE}  ·  {plural(t['ducks'], 'duck')} · {plural(t['ducklings'], 'duckling')} · "
             f"{t['active']} of them active · {t['waiting']} waiting{blocked} · "
             f"{fmt_tokens(t['tokens_per_min'])} tok/min · ≈${fleet.ledger.today(now).usd:.2f} today")
+
+
+# ------------------------------------------------------------------ the mosaic
+HEAT_ROWS = 4            # what fits on the deck panel with a legible label per row
+
+
+def row_labels(cwds: list[str], limit: int = 18) -> list[str]:
+    """A short name per folder, kept distinct.
+
+    Two projects really can end in the same segment -- every monorepo has three folders called
+    `api` -- and two rows labelled the same tell you nothing about either. Where the last
+    segment collides, the one before it comes along.
+    """
+    names = [folder_name(c, 0) for c in cwds]
+    clash = {n for n in names if names.count(n) > 1}
+    out = []
+    for cwd, name in zip(cwds, names):
+        if name in clash:
+            parts = [p for p in (cwd or "").replace("\\", "/").rstrip("/").split("/") if p]
+            if len(parts) > 1:
+                name = f"{parts[-2]}/{parts[-1]}"
+        out.append(name if len(name) <= limit else "…" + name[-(limit - 1):])
+    return out
+
+
+@dataclass
+class Heat:
+    """A project-by-hour history of spend, with no idea how it is drawn.
+
+    The board says what the whole fleet spent in the last day. This says which folder spent
+    it, and when -- the thing you want when you come back to the desk and the numbers are
+    bigger than you left them.
+    """
+    title: str = ""
+    rows: list[tuple[str, list[float]]] = field(default_factory=list)
+    ticks: list[tuple[int, str]] = field(default_factory=list)   # (column, clock label)
+    now_col: int = -1
+    peak: float = 0.0
+    foot: str = ""
+    ready: bool = True
+
+
+def heat_model(fleet: Fleet, now: float, board_range: str = "hour",
+               keys: list[str] | None = None, max_rows: int = HEAT_ROWS) -> Heat:
+    led = fleet.ledger
+    n, label, unit = RANGES[board_range]
+    h = Heat(title=f"{label}  ·  \u2248$ by project", ready=led.ready)
+    if not led.ready:
+        h.foot = "scanning logs…"
+        return h
+
+    # the pool's own lane order first, so a row here is the lane above it; then any folder
+    # that spent something in the window but has no duck left in the pool
+    order = list(keys or [])
+    order += [c for c in led.cwds() if c not in order]
+    rows = [(c, led.cwd_bars(c, board_range, now)) for c in order]
+    rows = [r for r in rows if r[0] in (keys or []) or any(v > 0 for v in r[1])]
+    if len(rows) > max_rows:
+        # keep the busiest, so a long tail of one-off folders cannot push the pool's own out
+        rows = sorted(rows, key=lambda r: -sum(r[1]))[:max_rows]
+    h.rows = [(lab, vals) for lab, (_c, vals) in zip(row_labels([c for c, _v in rows]), rows)]
+    h.peak = max((v for _n, vals in h.rows for v in vals), default=0.0)
+    h.now_col = n - 1
+
+    bounds = led.boundaries(board_range, now)
+    fmt = "%H:%M" if board_range == "min" else "%H:00" if board_range == "hour" else "%d %b"
+    every = max(1, n // 4)
+    h.ticks = [(i, time.strftime(fmt, time.localtime(bounds[i])))
+               for i in range(0, n, every)]
+
+    if h.peak > 0:
+        best = max(((v, i, name) for name, vals in h.rows for i, v in enumerate(vals)),
+                   key=lambda t: t[0])
+        when = time.strftime(fmt, time.localtime(bounds[best[1]]))
+        quiet = sum(1 for i in range(n) if all(vals[i] <= 0 for _n, vals in h.rows))
+        h.foot = (f"busiest {when} · {best[2]} {fmt_usd(best[0])}/{unit}"
+                  f"  ·  nothing at all in {quiet} of {n}")
+    else:
+        h.foot = f"nothing in the {label.replace('last ', '')}"
+    return h

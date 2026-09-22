@@ -65,18 +65,47 @@ CONTEXT_RAMP = [
 CONTEXT_LEGEND = [(0.0, "empty"), (0.45, "half"), (0.75, "filling"), (1.0, "full")]
 
 
-def context_ring_color(frac: float) -> tuple[float, float, float, float]:
-    """Colour for a context fill of `frac`, interpolated along CONTEXT_RAMP."""
+def folder_name(cwd: str, limit: int = 0) -> str:
+    """The last path segment of a working directory, which is what people call the project."""
+    name = (cwd or "").replace("\\", "/").rstrip("/").split("/")[-1] or (cwd or "(no cwd)")
+    if limit and len(name) > limit:
+        return name[:limit - 1] + "…"
+    return name
+
+
+def ramp_color(ramp, frac: float) -> tuple[float, float, float, float]:
+    """Interpolate a (stop, hex) ramp at `frac`, clamped to its ends."""
     f = max(0.0, min(1.0, frac))
-    lo = CONTEXT_RAMP[0]
-    for hi in CONTEXT_RAMP[1:]:
+    lo = ramp[0]
+    for hi in ramp[1:]:
         if f <= hi[0]:
             span = hi[0] - lo[0]
             k = 0.0 if span <= 0 else (f - lo[0]) / span
             a, b = hex_to_rgba(lo[1]), hex_to_rgba(hi[1])
             return tuple(a[i] + (b[i] - a[i]) * k for i in range(4))
         lo = hi
-    return hex_to_rgba(CONTEXT_RAMP[-1][1])
+    return hex_to_rgba(ramp[-1][1])
+
+
+def context_ring_color(frac: float) -> tuple[float, float, float, float]:
+    """Colour for a context fill of `frac`, interpolated along CONTEXT_RAMP."""
+    return ramp_color(CONTEXT_RAMP, frac)
+
+
+# The deck mosaic: how busy one project was in one hour, as a fraction of the busiest cell.
+# It starts barely off the slate it is set into, so an empty hour reads as empty rather than
+# as a colour, and it ends in the gold the rest of the pool already uses for spend.
+HEAT_RAMP = [
+    (0.00, "#1B2333"),
+    (0.06, "#1D5F7A"),
+    (0.35, "#1FB6A6"),
+    (0.72, "#F5C542"),
+    (1.00, "#FF7A1A"),
+]
+
+
+def heat_color(frac: float) -> tuple[float, float, float, float]:
+    return ramp_color(HEAT_RAMP, frac)
 
 
 # hat -> who wears it, for the on-screen key (HAT_MAP maps several patterns to one hat).

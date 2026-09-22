@@ -7,6 +7,14 @@ All notable changes to Duck Pond are recorded here. The format follows
 ## [Unreleased]
 
 ### Added
+- **The deck mosaic.** One row per project, one tile per hour, brightness for spend, set into
+  the near paving -- the largest piece of the frame that had nothing in it. The board says
+  what the whole fleet spent in the last day; this says which folder spent it and when, which
+  is the question you have when you come back and the number is bigger than you left it. An
+  overnight run reads as a bright band at 03:00 in one row and nothing in the others. Rows run
+  in the lane signs' own order, so a row is the lane above it, and the range follows the
+  board's, so `T` cycles both. What it says is a pure value (`cards.heat_model`) with the
+  painting separate (`scene/mosaic.py`), and `ledger.cwd_bars` is the new query behind it.
 - **A banner plane.** Every two and a half minutes a propeller plane crosses the sky towing
   a banner: the published Claude Code version on the top row, the one you are running
   underneath, and `UPDATE` when you are behind. Yours comes from `claude --version`, the

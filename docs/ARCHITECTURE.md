@@ -44,6 +44,7 @@ but skips its effect.
 | UI | `ui/cards.py`, `ui/hover.py`, `ui/panel.py` | yes | `cards.py` is pure text assembly (testable); `hover.py` draws it. |
 | Sound | `sound.py` | yes (`aud`) | Optional. Synthesized cues, no asset files. |
 | Herdr | `herdr.py` | no | Optional. Maps a session id to a terminal pane and raises it. `pane_in` is pure; the rest is subprocess and Win32, always on a thread. |
+| Mosaic | `ui/cards.heat_model`, `scene/mosaic.py` | model no, scene yes | The per-project history. What it says is a pure value the tests read; `mosaic.py` only paints tiles. |
 | Versions | `cli_version.py` | no | Optional. Yours from `claude --version`, the published one from the npm registry over HTTP. Parsing and comparison are pure; the fetching is on a thread. |
 
 The pure layers are why `python tests/test_core.py` works without Blender. Keep new logic

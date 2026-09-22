@@ -41,6 +41,7 @@ python tests\test_core.py                                # reducer, redaction, a
 python tests\test_signals.py                             # questions, denials, compaction, queue, cost, inference
 python tests\test_herdr.py                               # picking a Herdr pane from a session id
 python tests\test_cli_version.py                         # yours vs the published CLI version
+python tests\test_mosaic.py                              # per-project spend per hour, and its labels
 blender -b --python tests\headless_motion.py             # the smoothness contract
 blender -b --python tests\headless_smoke.py              # builds the demo, checks every visual, renders a still
 blender -b --python tests\headless_director.py           # camera + sky continuity under a busy fleet

@@ -179,6 +179,50 @@ class UsageLedger:
         start = self._month_start(now)
         return sum(usd for m, usd in self._cwd_usd.get(cwd or "(no cwd)", {}).items() if m >= start)
 
+    def cwd_bars(self, cwd: str, name: str, now: float) -> list[float]:
+        """Estimated $ per bucket for one working directory, oldest first.
+
+        The same cut as `bars`, one folder at a time: the fleet total is one line on the
+        board, and which folder spent it when is a different question.
+        """
+        bounds = self.boundaries(name, now)
+        vals = [0.0] * (len(bounds) - 1)
+        per = self._cwd_usd.get(cwd or "(no cwd)")
+        if not per:
+            return vals
+        for m, usd in per.items():
+            if bounds[0] <= m < bounds[-1]:
+                vals[bisect.bisect_right(bounds, m) - 1] += usd
+        return vals
+
+    def cwds(self) -> list[str]:
+        """Every working directory the ledger has ever seen, busiest first."""
+        return sorted(self._cwd_usd, key=lambda c: -sum(self._cwd_usd[c].values()))
+
+    def sample_history(self, now: float, cwds: list[str], usd_scale: float = 1.0) -> None:
+        """Fill in a plausible day of spend, one row per hour per folder.
+
+        For screenshots and tests, which must not depend on what this machine actually did --
+        the same reason `UsageLimits.set_snapshot` exists. A replayed fixture is under a minute
+        long, so the mosaic it produces is one bright column and twenty-three empty ones, which
+        shows the grid without showing the point of it.
+        """
+        # hand-written rather than random: an overnight run, a working day, and a folder that
+        # barely gets touched. Indexed oldest hour first, to match `bars`.
+        shapes = (
+            (0, 0, 0, 0, 1.9, 2.4, 1.1, 0, 0, 0, 0, .3, .6, .2, 0, 0, 0, 0, 0, .4, 1.2, .8, .1, .5),
+            (0, 0, 0, 0, 0, 0, 0, 0, .2, .9, 1.4, 1.1, .7, 1.6, 2.1, 1.3, .4, 0, 0, 0, 0, 0, 0, .2),
+            (0, 0, 0, 0, 0, 0, 0, 0, 0, 0, .1, 0, 0, 0, .3, 0, 0, 0, 0, 0, 0, .2, 0, 0),
+        )
+        bounds = self.boundaries("hour", now)
+        for i, cwd in enumerate(cwds):
+            shape = shapes[i % len(shapes)]
+            for h, mult in enumerate(shape):
+                if mult <= 0 or h >= len(bounds) - 1:
+                    continue
+                self.add({"at": bounds[h] + 90, "session_id": f"sample-{i}", "cwd": cwd,
+                          "usd": mult * usd_scale, "key": f"sample-{i}-{h}"})
+
     # ------------------------------------------------------------------ time
     def _local(self, ts: float) -> datetime:
         return datetime.fromtimestamp(ts, self.tz)

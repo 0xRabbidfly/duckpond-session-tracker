@@ -18,8 +18,10 @@ from duck_pond.adapters.stub import StubAdapter  # noqa: E402
 from duck_pond.cli_version import Versions  # noqa: E402
 from duck_pond.runtime import RT  # noqa: E402
 from duck_pond.scene import bather as bather_mod  # noqa: E402
+from duck_pond.scene import mosaic as mosaic_mod  # noqa: E402
 from duck_pond.scene import pitchers as pitchers_mod  # noqa: E402
 from duck_pond.scene import plane as plane_mod  # noqa: E402
+from duck_pond.scene import pool as P  # noqa: E402
 from duck_pond.scene import props as props_mod  # noqa: E402
 from duck_pond.scene.pitchers import JUG_H, WALL  # noqa: E402
 from duck_pond.ui import cards  # noqa: E402
@@ -194,6 +196,40 @@ _week_label = obj("DP_JugSub_week").data.body
 check(_week_label == "Sep 26, 4pm", f"the reset time is written under the jug ({_week_label!r})")
 RT.pitchers.update(Usage(ok=False, error="no CLI"))
 check(obj("DP_JugSub_session").data.body == "no reading", "a failed read says so rather than showing zero")
+# the deck mosaic: which project spent what, and when. The board only ever gives the total,
+# so the rows here have to add up to it and the brightest tile has to be the busiest hour.
+RT.fleet.ledger.sample_history(t0 + _t, list(RT.lanes.keys), usd_scale=1.0)
+_heat = cards.heat_model(RT.fleet, t0 + _t, "hour", keys=list(RT.lanes.keys))
+RT.mosaic.update(_heat)
+check(len(_heat.rows) == len(RT.lanes.keys),
+      f"one row per lane ({len(_heat.rows)} for {len(RT.lanes.keys)} lanes)")
+_board = RT.fleet.ledger.bars("hour", t0 + _t)
+_summed = [sum(vals[i] for _n, vals in _heat.rows) for i in range(len(_board))]
+check(all(abs(a - b) < 1e-6 for a, b in zip(_board, _summed)),
+      "the rows add up to the board's own bars, column by column")
+_peak_tile, _peak_col = None, -1
+for _r, (_n, _vals) in enumerate(_heat.rows):
+    for _c, _v in enumerate(_vals):
+        if _v == _heat.peak:
+            _peak_tile, _peak_col = obj(f"DP_MosaicTile_{_r}_{_c}"), _c
+check(_peak_tile is not None and _peak_tile.color[0] > 0.8 and _peak_tile.color[2] < 0.2,
+      f"the busiest hour's tile is at the hot end of the ramp ({tuple(round(v, 2) for v in _peak_tile.color)})")
+_empty = next((obj(f"DP_MosaicTile_0_{c}") for c, v in enumerate(_heat.rows[0][1]) if v == 0), None)
+check(_empty is not None and sum(_empty.color[:3]) < 0.1,
+      f"an hour with nothing in it stays dark ({tuple(round(v, 3) for v in _empty.color) if _empty else None})")
+check(not obj(f"DP_MosaicRow_{len(_heat.rows) - 1}").hide_render
+      and obj(f"DP_MosaicRow_{mosaic_mod.ROWS - 1}").hide_render == (len(_heat.rows) < mosaic_mod.ROWS),
+      "rows past the last project are hidden rather than left blank")
+# the panel earns its place by filling paving nothing else uses, so it must not climb up
+# into the water. The line from the overview camera's eye to the pool's near edge is the
+# ceiling: the panel's top may kiss it, and must not rise far past it.
+_top = RT.mosaic.objects["root"].matrix_world @ Vector((0.0, mosaic_mod.H, 0.0))
+_eye = P.CAM_OVERVIEW[0]
+_ceiling = _eye.z * (1.0 - (_top.y - _eye.y) / (0.0 - _eye.y))   # z of that line at _top.y
+check(_top.z - _ceiling < 0.15,
+      f"the panel stops at the water's near edge (top {_top.z:.2f} vs sight line {_ceiling:.2f})")
+check(obj("DP_MosaicNow").location.x > obj("DP_MosaicTile_0_0").location.x,
+      "the now marker sits over the newest column, not the oldest")
 # the mark above the jugs reaches its arms out and draws them back, rather than turning
 RT.pitchers.pulse(0.0)
 _arm0 = [obj(f"DP_UsageRay{i}").scale.x for i in range(3)]
