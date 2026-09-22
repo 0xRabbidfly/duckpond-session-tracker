@@ -220,10 +220,11 @@ class DUCKPOND_OT_hover(bpy.types.Operator):
         card = cards.card_for(RT.fleet, kind, key, now, RT.redact)
         # The pool-wide totals used to sit down here permanently. They are on the board at
         # the top of the screen, and a second copy in the corner only ever got read as
-        # belonging to the duck whose card was above it. What is left is the modes, which
-        # are warnings about the pond lying to you and have to be visible somewhere.
-        flags = [f for f, on in (("PAUSED", RT.paused), ("REDACTION OFF", not RT.redact),
-                                 ("DIRECTOR", RT.director.enabled)) if on]
+        # belonging to the duck whose card was above it. What is left is the two modes that
+        # mean the pond is not telling you the whole truth. The auto camera used to be listed
+        # here too, and it is on by default in kiosk mode, so it was a permanent box naming
+        # an internal setting rather than a warning about anything.
+        flags = [f for f, on in (("PAUSED", RT.paused), ("REDACTION OFF", not RT.redact)) if on]
         footer = "   ·   ".join(flags)
         if card or footer:
             self._draw_card(context, region, card, footer, key)

@@ -28,8 +28,12 @@ from .deck import _set_body, _text
 # The south deck slab spans y -2.1..-0.1 with its top at z 0.10. Set left of the frame's
 # centre, not the pool's: this paving is a third of the distance away, so it magnifies about
 # 1.7x, and the on-screen key owns the bottom-right corner. The panel stops where the key
-# starts rather than running underneath it.
-AT = (4.5, -1.68, 0.11)
+# starts rather than running underneath it, and sits far enough forward on the paving to
+# share the key's band: measured, its top lands on 0.185 of the frame height and the
+# key's on 0.184. Its base sits at the very front of the paving, which is what puts its
+# foot on the same line as the key's: measured from the render, not reasoned about, because
+# a wide panel's top edge does not project where its centre does.
+AT = (4.5, -2.14, 0.11)
 TILT = math.radians(58)     # face normal back up the view axis; the camera looks down ~30
 # Measured, not guessed: one world unit here is 0.068 of the frame width, so 9.0 reaches from
 # the left margin to the key's left edge, and a height of 1.12 stops at the water's near edge.

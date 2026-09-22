@@ -65,6 +65,12 @@ All notable changes to Duck Pond are recorded here. The format follows
   far on a fixed line, and ≈$ bars for the range with their peak.
 
 ### Changed
+- The bottom-left corner no longer shows `DIRECTOR`. The auto camera is on by default in
+  kiosk mode, so it was a permanent box in the corner naming an internal setting rather than
+  warning about anything. `PAUSED` and `REDACTION OFF` stay, because those two do mean the
+  pond is not telling you the whole truth.
+- The deck mosaic sits at the very front of the paving, so its foot lands on the same line as
+  the on-screen key's and the two read as one band across the bottom of the frame.
 - The banner plane's tow line is three times longer and its banner a quarter smaller. The
   board across the top of the screen covers the whole sky band in the middle of the frame,
   so a short rig vanished behind it whole; a long one keeps the banner clear while the
