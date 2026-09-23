@@ -51,8 +51,10 @@ The pure tests run in plain Python because `duck_pond.model`, `duck_pond.theme` 
 `duck_pond.adapters` import without `bpy`. Keep it that way: anything new that needs Blender
 goes under `scene/`, `sim/`, `ui/` or `runtime.py`.
 
-CI runs ruff and the pure tests on every push and pull request, and the three headless
-Blender tests when `duck_pond/`, `tests/` or `fixtures/` change.
+The GitHub Actions workflows are off: both are `workflow_dispatch` only, so nothing runs on
+a push or a pull request and the checks above are the ones that count. Run them locally
+before you push. To turn the runner back on, put the `push:` and `pull_request:` triggers
+back in `.github/workflows/ci.yml` and `.github/workflows/blender.yml`.
 
 ## The smoothness contract
 

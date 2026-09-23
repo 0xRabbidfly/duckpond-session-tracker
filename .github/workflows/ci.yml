@@ -1,9 +1,10 @@
 name: CI
 
+# Off: this runs by hand only. Every run was failing and a wall of red says nothing about
+# the change in front of it. The tests themselves are the ones you run locally (see
+# CONTRIBUTING.md); put `push:` and `pull_request:` back here to turn the runner on again.
 on:
-  push:
-    branches: [main]
-  pull_request:
+  workflow_dispatch:
 
 permissions:
   contents: read

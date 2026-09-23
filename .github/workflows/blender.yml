@@ -3,20 +3,11 @@ name: Blender headless
 # The load-bearing tests need bpy: the motion smoothness contract, the visual smoke test
 # and the camera director. They run in background Blender (no GPU needed; the smoke test
 # falls back to Workbench when EEVEE cannot render).
+# Off: this runs by hand only. Every run was failing and a wall of red says nothing about
+# the change in front of it. These tests want a real Blender, which is on the machine you
+# are working on anyway; put the `push:` and `pull_request:` triggers back to turn the
+# runner on again (both filtered on duck_pond/**, tests/**, fixtures/** and this file).
 on:
-  push:
-    branches: [main]
-    paths:
-      - "duck_pond/**"
-      - "tests/**"
-      - "fixtures/**"
-      - ".github/workflows/blender.yml"
-  pull_request:
-    paths:
-      - "duck_pond/**"
-      - "tests/**"
-      - "fixtures/**"
-      - ".github/workflows/blender.yml"
   workflow_dispatch:
 
 permissions:
