@@ -39,6 +39,11 @@ class Sky:
         self.lights: list[bpy.types.Object] = []
         self.last_tick = 0.0
         self._primed = False
+        # What the shaders were last told. The sky and the water are written through shader
+        # node values, which is the most expensive thing this file does -- and the sun moves
+        # 0.2° a minute, so writing it 60 times a second sets the same numbers again. None
+        # means "never written", so the first frame always lands.
+        self._wrote: dict[str, float | None] = {"chop": None, "night": None, "day": None, "hour": None}
 
     def hour(self, now: float) -> float:
         if self.clock_override is not None:
@@ -50,6 +55,8 @@ class Sky:
     def ensure(self) -> None:
         if self.lights and self.lights[0].name in bpy.data.objects:
             return
+        # anything built here is new, so the shaders have been told nothing: say it all again
+        self._wrote = dict.fromkeys(self._wrote)
         mat = M.object_color_material("LidoLight", roughness=0.3, emission=4.0, alpha_from_object=False)
         post_mat = M.flat_material("Pole", "#C8CCD2", roughness=0.4)
         for i in range(N_LIGHTS):
@@ -88,12 +95,22 @@ class Sky:
             self.night, self.chop, self.rain = night, self.chop_target, self.rain_target
             self._primed = True
         self.night += (night - self.night) * min(1.0, dt * 2.0)
+        # Only when the number has actually moved. Every one of these walks a node tree to
+        # find the node it writes; none of them can show a change smaller than these steps.
+        w = self._wrote
         water = bpy.data.materials.get("DP_Water")
         if water is not None:
-            M.water_set_chop(water, self.chop)
-            M.water_set_night(water, self.night)
-        self._sun(h, day)
-        self._world(day)
+            if w["chop"] is None or abs(self.chop - w["chop"]) > 5e-3:
+                M.water_set_chop(water, self.chop)
+                w["chop"] = self.chop
+            if w["night"] is None or abs(self.night - w["night"]) > 5e-3:
+                M.water_set_night(water, self.night)
+                w["night"] = self.night
+        # the sun and the sky ramp follow the clock: a minute of it, not a frame of it
+        if w["hour"] is None or abs(h - w["hour"]) > 1 / 60 or abs(day - (w["day"] or 0.0)) > 1e-3:
+            self._sun(h, day)
+            self._world(day)
+            w["hour"], w["day"] = h, day
         on = self.night > 0.5
         for o in self.lights:
             if o.hide_viewport == on:

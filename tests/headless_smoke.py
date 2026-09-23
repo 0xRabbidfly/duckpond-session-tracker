@@ -237,6 +237,19 @@ check(_top.z - _ceiling < 0.15,
       f"the panel stops at the water's near edge (top {_top.z:.2f} vs sight line {_ceiling:.2f})")
 check(obj("DP_MosaicNow").location.x > obj("DP_MosaicTile_0_0").location.x,
       "the now marker sits over the newest column, not the oldest")
+# A tile has to be narrower than the column it sits in, in EVERY range. The tile mesh is
+# cached by name, and it used to be cached by that name alone: whichever range was built
+# first set the width for all of them, so the minute view (60 columns) drew 24-column tiles
+# and the whole row ran together as one smear.
+bpy.context.view_layer.update()
+for _rng, _cols in (("hour", 24), ("min", 60), ("week", 8), ("hour", 24)):
+    RT.mosaic.update(cards.heat_model(RT.fleet, t0 + _t, _rng, keys=list(RT.lanes.keys)))
+    bpy.context.view_layer.update()
+    _step = RT.mosaic.objects["step"]
+    _w = obj("DP_MosaicTile_0_0").dimensions.x
+    check(0.3 * _step < _w < _step,
+          f"{_rng}: a tile fits its column ({_w:.3f} wide in a {_step:.3f} step, {_cols} columns)")
+    check(obj("DP_MosaicNow").dimensions.x < _step, f"{_rng}: so does the now marker")
 # the mark above the jugs reaches its arms out and draws them back, rather than turning
 RT.pitchers.pulse(0.0)
 _arm0 = [obj(f"DP_UsageRay{i}").scale.x for i in range(3)]

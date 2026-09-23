@@ -145,16 +145,10 @@ class LaneSigns:
         for key in [k for k in self.objects if k not in live_keys]:
             d = self.objects.pop(key)
             for o in [d["root"], d["plate"], d["name"], d["sub"]] + d["dots"]:
-                try:
-                    bpy.data.objects.remove(o, do_unlink=True)
-                except ReferenceError:
-                    pass
+                P.remove_object(o)  # and the sign's own text curves
 
     def clear(self) -> None:
         for key in list(self.objects):
             d = self.objects.pop(key)
             for o in [d["root"], d["plate"], d["name"], d["sub"]] + d["dots"]:
-                try:
-                    bpy.data.objects.remove(o, do_unlink=True)
-                except ReferenceError:
-                    pass
+                P.remove_object(o)  # and the sign's own text curves

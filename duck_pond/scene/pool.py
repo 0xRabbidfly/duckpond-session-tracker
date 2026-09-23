@@ -48,6 +48,32 @@ def new_object(name: str, data=None) -> bpy.types.Object:
     return link(obj)
 
 
+def remove_object(obj) -> None:
+    """Remove an object and, with it, any DP_ datablock nothing else points at.
+
+    Deleting an object does not delete its mesh or its text curve: those sit in the file as
+    orphans until something purges them, and in a pool that runs all day nothing does. The
+    text curves are the ones that add up -- every duck brings three of them (name, its
+    outline, the branch flag) and every packet one, and every duck that leaves the pool used
+    to leave them all behind. Shared meshes are never caught by this: another duck is still
+    using them, so they still have users.
+    """
+    data = getattr(obj, "data", None)
+    try:
+        bpy.data.objects.remove(obj, do_unlink=True)
+    except ReferenceError:
+        return
+    try:
+        if data is None or data.users or not data.name.startswith("DP_"):
+            return
+        if isinstance(data, bpy.types.Curve):
+            bpy.data.curves.remove(data)
+        elif isinstance(data, bpy.types.Mesh):
+            bpy.data.meshes.remove(data)
+    except ReferenceError:
+        pass
+
+
 def get(name: str):
     return bpy.data.objects.get(name)
 
@@ -380,10 +406,7 @@ class Lanes:
 
     def _rebuild(self, w: float) -> None:
         for o in self.objects:
-            try:
-                bpy.data.objects.remove(o, do_unlink=True)
-            except ReferenceError:
-                pass
+            remove_object(o)
         self.objects = []
         rope_mat = M.lane_rope_material()
         for i, key in enumerate(self.keys):

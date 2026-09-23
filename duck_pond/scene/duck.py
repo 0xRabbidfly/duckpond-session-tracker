@@ -218,10 +218,7 @@ class DuckObj:
         if kind == self.hat_kind and self.hat:
             return
         if self.hat:
-            try:
-                bpy.data.objects.remove(self.hat, do_unlink=True)
-            except ReferenceError:
-                pass
+            P.remove_object(self.hat)
         main, accent = _hat_mats(kind)
         self.hat = P.new_object(f"{self.obj.name}_hat", MS.hat_mesh(kind, main, accent))
         self.hat.parent = self.obj
@@ -300,9 +297,5 @@ class DuckObj:
         texts = [o for o in (self.flag, self.label) if o is not None]
         extras = [bpy.data.objects.get(o.get(k, "")) for o in texts for k in ("dp_outline", "dp_badge")]
         for o in extras + texts + [self.hat, self.lifering, self.pole, self.beacon, self.halo] + self.trays + [self.obj]:
-            if o is None:
-                continue
-            try:
-                bpy.data.objects.remove(o, do_unlink=True)
-            except ReferenceError:
-                pass
+            if o is not None:
+                P.remove_object(o)  # takes the duck's own text curves with it

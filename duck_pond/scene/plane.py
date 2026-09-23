@@ -26,7 +26,11 @@ from .deck import _set_body, _text
 LANE_Y = 20.0
 LANE_Z = 0.62            # centred in the sky band; at 1.05 it grazed the top edge
 X0, X1 = -13.0, 40.0     # off the left edge to off the right; the rig is 11 units long
-SPEED = 3.2              # units per second: about fifteen seconds to cross
+# Units per second. Slow, because the reading time is not the crossing: the board owns the
+# top centre of the frame, exactly the band the banner flies through, so what you get is two
+# clear windows -- one on the way in, one on the way out. Measured at 3.2 they were 2.2 s
+# each, which is not long enough to read two version numbers; at 1.8 they are 4.0 s.
+SPEED = 1.8
 EVERY_S = 150.0          # one flypast every two and a half minutes
 BOB = 0.11               # a little air under it, so it is not on rails
 BOB_HZ = 0.35

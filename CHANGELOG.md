@@ -78,8 +78,22 @@ All notable changes to Duck Pond are recorded here. The format follows
   kiosk mode, so it was a permanent box in the corner naming an internal setting rather than
   warning about anything. `PAUSED` and `REDACTION OFF` stay, because those two do mean the
   pond is not telling you the whole truth.
+- **The mosaic's hours are squeezed to 72 % of their width** and the slate pulled in with
+  them, so the panel keeps its left edge and gives back the middle of the frame. The
+  columns were wider than an hour of spend needs to be read, and the panel ran from the
+  left margin all the way to the key with nothing between them.
+- **The banner plane flies at 1.8 units a second instead of 3.2**, which is a 29-second
+  crossing rather than a 17-second one. The reading time was never the crossing: the board
+  across the top of the screen owns the middle of the sky band the banner flies through, so
+  what you get is one clear window on the way in and one on the way out. Measured, they were
+  2.2 seconds each, which is not long enough to read two version numbers; they are 4.0 now.
 - The deck mosaic sits at the very front of the paving, so its foot lands on the same line as
   the on-screen key's and the two read as one band across the bottom of the frame.
+- **The sky and the water are written only when their numbers move.** Both are set through
+  shader node values, each of which walks a node tree to find the node it writes, and both
+  were written on every frame -- the sun moves 0.2° a minute. The frame handler's own cost
+  goes from 4.9 ms to 2.8 ms on a five-duck pool, which is a third of a 60 fps budget
+  handed back. Nothing looks different: the guards are tighter than anything either can show.
 - The banner plane's tow line is three times longer and its banner a quarter smaller. The
   board across the top of the screen covers the whole sky band in the middle of the frame,
   so a short rig vanished behind it whole; a long one keeps the banner clear while the
@@ -157,6 +171,18 @@ All notable changes to Duck Pond are recorded here. The format follows
 - README screenshots live in `docs/media/` so they render on GitHub.
 
 ### Fixed
+- **Every duck that left the pool left its name behind.** Deleting an object does not delete
+  its mesh or its text curve; those stay in the file as orphans, and nothing was purging
+  them after startup. Each duck carries three text curves (its name, that name's outline,
+  the branch flag), each lane sign two and each packet one. Measured on the demo fixture
+  with ducks coming and going: 96 curve datablocks in six minutes, all of them orphans.
+  `pool.remove_object` now takes an object's data with it when nothing else points at it,
+  and the same six minutes leave 12 -- the ones the living ducks are using.
+- **The mosaic drew one range's tiles at another range's width.** The tile mesh was cached
+  under one name, so whichever range was built first set the width for every range after
+  it: the minute view drew 24-column tiles in 60 columns, each more than twice its own
+  step, and an hour of spend ran into its neighbours as one smear. The width is part of the
+  cache key now, and the gap between tiles gives way when the columns get too close for it.
 - **A session you came back to lost its hat, and with it its context colour.** Leave a
   session alone long enough and housekeeping ends it and drops it; the next line it writes
   rebuilds it from `SessionSeen`, which carried no model. `ModelChanged` only fires on a

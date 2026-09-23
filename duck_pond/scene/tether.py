@@ -95,10 +95,7 @@ class Tether:
         return self.points[i].lerp(self.points[i + 1], s - i)
 
     def remove(self) -> None:
-        try:
-            bpy.data.objects.remove(self.obj, do_unlink=True)
-        except ReferenceError:
-            pass
+        P.remove_object(self.obj)
 
 
 class _PacketVisual:

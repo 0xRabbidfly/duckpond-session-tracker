@@ -33,11 +33,14 @@ from .deck import _set_body, _text
 # key's on 0.184. Its base sits at the very front of the paving, which is what puts its
 # foot on the same line as the key's: measured from the render, not reasoned about, because
 # a wide panel's top edge does not project where its centre does.
-AT = (4.5, -2.14, 0.11)
+AT = (3.475, -2.14, 0.11)
 TILT = math.radians(58)     # face normal back up the view axis; the camera looks down ~30
-# Measured, not guessed: one world unit here is 0.068 of the frame width, so 9.0 reaches from
-# the left margin to the key's left edge, and a height of 1.12 stops at the water's near edge.
-W, H = 9.0, 1.12
+# Measured, not guessed: one world unit here is 0.068 of the frame width. At 9.0 the panel
+# reached from the left margin all the way to the key and the hours were wider than they
+# needed to be to be read; the columns are squeezed to 72 % of that and the slate pulled in
+# with them, so the panel keeps its left edge and gives back the middle of the frame. A
+# height of 1.12 stops at the water's near edge.
+W, H = 6.95, 1.12
 ROWS = 4                    # cards.HEAT_ROWS; a fifth row costs every row its legible label
 
 # Everything below is in the panel's own space: x from -W/2 to W/2, y from 0 at the bottom.
@@ -73,12 +76,16 @@ def _panel_mesh(slate, edge):
 
 
 def _tile_mesh(mat, w: float, h: float):
-    me = MS._existing("MosaicTile")
+    # The width is in the name: the cache is by name, and the ranges do not agree on it.
+    # Keyed on "MosaicTile" alone, the minute view (60 columns) drew 24-column tiles at a
+    # fifth of their step and the row came out as one smear; the week view (8) drew islands.
+    name = f"MosaicTile_{w:.3f}"
+    me = MS._existing(name)
     if me:
         return me
     b = MS._Builder()
     b.box(w, h, 0.02)
-    return b.finish("MosaicTile", [mat])
+    return b.finish(name, [mat])
 
 
 class DeckMosaic:
@@ -111,7 +118,10 @@ class DeckMosaic:
         grid_x0 = -W / 2 + PAD_X + LABEL_W
         grid_w = (W / 2 - PAD_X) - grid_x0
         step = grid_w / cols
-        tw, th = step - TILE_GAP, ROW_H - TILE_GAP
+        # The gap is a fixed distance until the columns get too close for it: at 60 of them
+        # it was more than half the step and an hour of spend read as a hairline.
+        gap = min(TILE_GAP, step * 0.25)
+        tw, th = step - gap, ROW_H - TILE_GAP
         tile_me = _tile_mesh(tile_mat, tw, th)
 
         self.tiles = []
@@ -147,8 +157,8 @@ class DeckMosaic:
             t.hide_viewport = t.hide_render = True
         # a gold bar over the column we are living in. Under the grid it sat in the band of
         # a row that was not there, and read as a cell rather than as a marker.
-        mark = P.new_object("DP_MosaicNow", MS.plate_mesh(
-            "MosaicNow", tw, 0.028, M.flat_material("MosaicNow", NOW_MARK, roughness=0.3, emission=1.6)))
+        mark = P.new_object("DP_MosaicNow", MS.plate_mesh(  # width in the name, as the tiles do
+            f"MosaicNow_{tw:.3f}", tw, 0.028, M.flat_material("MosaicNow", NOW_MARK, roughness=0.3, emission=1.6)))
         mark.parent = root
         mark.location = (grid_x0 + (cols - 0.5) * step, GRID_TOP + 0.042, 0.04)
 
@@ -162,7 +172,7 @@ class DeckMosaic:
     def wipe(self) -> None:
         for name in list(bpy.data.objects.keys()):
             if name.startswith("DP_Mosaic"):
-                bpy.data.objects.remove(bpy.data.objects[name], do_unlink=True)
+                P.remove_object(bpy.data.objects[name])
         self.objects = {}
         self.tiles = []
         self._cols = 0
