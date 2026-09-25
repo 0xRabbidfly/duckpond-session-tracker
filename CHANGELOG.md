@@ -205,6 +205,8 @@ All notable changes to Duck Pond are recorded here. The format follows
   (1M), and a date stamp is not a version.
 
 ### Removed
+- GitHub Actions: both workflows (CI and headless Blender) and the Dependabot config that
+  only updated them. The checks run locally.
 - Coin stacks beside the lane signs. The month's spend is already on the sign in figures, and
   the stacks were what the signs had to stay clear of.
 

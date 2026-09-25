@@ -9,7 +9,7 @@ authors = [{ name = "Nuno Borges" }]
 keywords = ["blender", "claude-code", "agents", "visualization", "observability"]
 
 # Duck Pond is a Blender add-on, not a pip package: nothing here is meant to be installed.
-# This file carries the project metadata and the lint configuration used by CI.
+# This file carries the project metadata and the lint configuration.
 
 [tool.ruff]
 target-version = "py311"   # Blender 4.2 ships 3.11; 5.x ships 3.13

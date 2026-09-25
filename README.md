@@ -205,8 +205,7 @@ blender -b --python dev\render_showcase.py                 # out\showcase_*.png 
 blender --python dev\gui_shot.py -- --kiosk --out out\gui_tags.png   # real GUI overlay screenshot
 ```
 
-CI runs the lint and the pure tests on every push, and the headless Blender tests whenever
-the add-on, tests or fixtures change.
+There is no CI; run these locally before you push.
 
 ## Not built yet
 
