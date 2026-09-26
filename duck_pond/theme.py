@@ -128,6 +128,18 @@ def heat_color(frac: float) -> tuple[float, float, float, float]:
     return ramp_color(HEAT_RAMP, frac)
 
 
+# The washing line (scene/laundry.py): (towel, stripe) per kind of thing on it. Pool towels,
+# kept clear of the state colours: navy for a changed file, the same towel inverted for a new
+# one, red for a conflict -- which, like the red halo, is stopped until you act -- and sand
+# for a commit folded over the line, waiting to be pushed.
+LAUNDRY_COLORS = {
+    "changed":  ("#24418F", "#F4F1EA"),
+    "new":      ("#F1EEE6", "#24418F"),
+    "conflict": ("#D7332A", "#F4F1EA"),
+    "folded":   ("#E2C98F", "#24418F"),
+}
+
+
 # hat -> who wears it, for the on-screen key (HAT_MAP maps several patterns to one hat).
 # The propeller is deliberately absent: Gemini still gets one, it just does not earn a row.
 HAT_LEGEND = [

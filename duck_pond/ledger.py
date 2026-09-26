@@ -199,6 +199,12 @@ class UsageLedger:
         """Every working directory the ledger has ever seen, busiest first."""
         return sorted(self._cwd_usd, key=lambda c: -sum(self._cwd_usd[c].values()))
 
+    def cwds_since(self, start: float) -> list[str]:
+        """Working directories with any usage in a minute at or after `start`: the folders the
+        washing line keeps checking after their ducks have gone."""
+        m0 = int(start // 60) * 60
+        return [c for c, per in self._cwd_usd.items() if c != "(no cwd)" and per and max(per) >= m0]
+
     def sample_history(self, now: float, cwds: list[str], usd_scale: float = 1.0) -> None:
         """Fill in a plausible day of spend, one row per hour per folder.
 

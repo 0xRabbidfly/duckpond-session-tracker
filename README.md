@@ -22,6 +22,9 @@ spend; each lane sign on the west deck carries branches, sessions and that folde
 two **jugs of sangria** on the far deck fill with your Anthropic 5-hour and 7-day usage.
 A **mosaic** set into the near paving gives one row per project and one tile per hour, so you
 can see which folder spent what, and when, without reading a log.
+A **washing line** on the far deck hangs out the work nobody has committed: a towel per changed
+file, one folded over the line per commit not yet pushed, and the repo's name in gold once no
+duck is left working in it.
 Every couple of minutes a propeller plane tows a banner across the sky with the published
 Claude Code version over the one you are running. An android sits on the edge with her
 feet in the water; she puts a hand up when a duck is stopped waiting on an answer from
@@ -81,7 +84,7 @@ clock override to preview the night lido.
 
 | Key (viewport) | Action |
 |---|---|
-| hover | card for the duck / duckling / tether under the mouse |
+| hover | card for the duck / duckling / tether under the mouse; over the washing line, every repo with laundry |
 | click | pin the card to that duck / duckling: it tracks it until you click elsewhere (full details in the sidebar). With [Herdr](https://herdr.dev) running, this also brings that session's terminal to the front |
 | click a range tab on the board | switch the board's range: `min` `hour` `day` `week` `month` |
 | `T` | cycle the board's range |
@@ -128,6 +131,11 @@ clock override to preview the night lido.
 | a flamingo float, a beach ball, a lily pad drifting at the edge | nothing at all; the pool is a place, not only a chart |
 | a plane towing a banner across the sky | the published Claude Code version, over yours; `UPDATE` if you are behind |
 | a bright tile in the deck mosaic | that project spent that much in that hour; the row is the lane above it |
+| towels pegged on the washing line on the far deck | files in that repo nobody has committed: navy = changed, white = new, red = a merge conflict |
+| a towel folded over the line | a commit the remote does not have yet |
+| a line card's name in gold | no duck is working in that repo any more: the laundry was left out |
+| a `+N more` card at the end of the line | N more repos with laundry than fit; hover the line to see them all |
+| one card reading `all put away` | every repo your sessions touched is committed and pushed |
 
 ![Compaction: the geyser goes up, the duck pops up with it](docs/media/compaction.jpg)
 
@@ -148,6 +156,20 @@ how much of that window you have spent; the label above it gives the percentage 
 window clears. The numbers come from `claude -p /usage`, which is a real subprocess that spends
 a few tokens, so it runs every 15 minutes by default and the pool draws the last good answer in
 between. Both the toggle and the interval are in the sidebar; turn it off and the jugs empty.
+
+Behind them runs a **washing line**. An agent says it is done and swims off, and whether anyone
+then committed what it wrote is a question nothing in the pool used to ask. Every 20 seconds
+Duck Pond runs `git status` in each folder a session is working in, and in every folder that
+spent anything in the last day, so the laundry stays up after the ducks that left it out have
+gone. Each repository with something outstanding gets a card and its towels: one per file (navy
+for a change, white for a new file, red for a merge conflict) and one folded over the line per
+commit its remote does not have -- for a branch with no upstream, the commits no remote has.
+The card gives the counts, and its name turns gold when no live duck is working in that repo.
+Three repos fit on the line, left-out ones first. Any more are never dropped: they are added up
+on a `+N more` card at the end of the line (gold if one of them was left out), and hovering the
+line brings up a card listing every repo with its counts. When everything your sessions touched
+is committed and pushed, one card says `all put away`. The toggle is in the sidebar, and the demo
+hangs a sample.
 
 Spend is an **estimate**: every reply's tokens (input, 5-minute and 1-hour cache writes,
 cache reads, output) × that model's API list price, marked `≈$`. It is what the usage would
@@ -183,6 +205,11 @@ turn durations, `cost-state` (lines added/removed, per-model usage), permission 
 `run_in_background`). Session states other than questions and denials are inferred from
 the transcript tail and marked so on the card.
 
+The washing line runs `git status`, and for a branch with no upstream `git rev-list`, in the
+repositories your sessions worked in. Both are read-only, and `--no-optional-locks` stops even
+the index refresh a plain `git status` writes, so the pool never takes `index.lock` from under
+an agent that is committing. Only counts are kept; no file name is shown or stored.
+
 Text excerpts shown on cards and tags are redacted by default (keys, tokens, long random
 identifiers) and truncated. See [`SECURITY.md`](SECURITY.md).
 
@@ -198,6 +225,7 @@ director camera is a critically damped spring on position and look-at.
 ruff check .                                               # lint (pyproject.toml)
 python tests\test_core.py                                  # reducer, redaction, adapter on real logs
 python tests\test_signals.py                               # questions, denials, compaction, queue, cost, inference
+python tests\test_laundry.py                               # the washing line: git status, pegs, never writes to a repo
 blender -b --python tests\headless_motion.py               # the smoothness contract (no snaps, no sawing, no sliding)
 blender -b --python tests\headless_smoke.py                # builds the demo, checks every visual, renders out\smoke_eevee.png
 blender -b --python tests\headless_director.py             # camera + world continuity under a busy fleet
@@ -226,11 +254,12 @@ duck_pond/
   usage_limits.py    the 5-hour and 7-day limits, read from `claude -p /usage` on its own thread
   herdr.py           click a duck to raise its terminal in Herdr (pane lookup by session id)
   cli_version.py     yours vs the published CLI, for the banner the plane tows
+  laundry.py         the washing line: read-only `git status` per session folder, and what hangs where
   ledger.py          every reply's tokens, priced, in per-minute buckets; per folder too
   scene/             pool (water, tiled deck, lawn), duck (beacon, context ring, mail, glow),
                      tether, ripples, fx (chips, orbs, geyser, rain), deck (lane signs),
                      pitchers (the sangria jugs), plane (the version banner),
-                     mosaic (the deck's per-project history),
+                     mosaic (the deck's per-project history), laundry (the washing line),
                      props (floating toys), sky (sun, night, chop, rain)
   sim/motion.py      per-frame motion: contract, personality, separation, body language
   sim/director.py    camera: eases to the duck you pinned, critically damped; never roams
@@ -242,7 +271,7 @@ duck_pond/
 launcher/            DuckPond.exe source (finds Blender, unpacks the add-on, starts the pool) + icon
 fixtures/demo.json   scripted demo: fan-out, nested + background agents, question, denial, compaction
 dev/                 launch.py|cmd, build_exe.py, render_showcase.py, gui_shot.py, render_icon.py
-tests/               core, signals, ledger, usage, herdr, cli version, mosaic,
+tests/               core, signals, ledger, usage, herdr, cli version, mosaic, laundry,
                      headless motion / smoke / director / watchdog
 docs/                ARCHITECTURE.md, media/
 ```

@@ -219,6 +219,9 @@ class DUCKPOND_OT_hover(bpy.types.Operator):
         elif key:
             self._draw_name_tag(region, rv3d, key, now)
         card = cards.card_for(RT.fleet, kind, key, now, RT.redact)
+        if card is None and kind == "laundry" and not RT.pinned:
+            # the washing line: every repository with laundry, not just the three on the line
+            card = cards.laundry_card(RT.laundry.snapshot(), [s.cwd for s in RT.fleet.live_sessions()], RT.redact)
         # The pool-wide totals used to sit down here permanently. They are on the board at
         # the top of the screen, and a second copy in the corner only ever got read as
         # belonging to the duck whose card was above it. What is left is the two modes that
@@ -263,7 +266,7 @@ class DUCKPOND_OT_hover(bpy.types.Operator):
         y1 = y0 + height
         self._rect(x0, y0, x0 + width, y1, BG)
         if card:
-            sc = cards.state_rgba(card.state)
+            sc = cards.card_rgba(card)
             self._rect(x0, y0, x0 + 6, y1, (sc[0], sc[1], sc[2], 1.0))
             if RT.pinned and RT.pinned == key:
                 self._rect(x0, y1 - 3, x0 + width, y1, (1.0, 0.7, 0.3, 0.9))
@@ -276,7 +279,7 @@ class DUCKPOND_OT_hover(bpy.types.Operator):
             blf.draw(FONT, card.title)
             # state, right-aligned on the title row, in the state colour
             blf.size(FONT, 13)
-            sc = cards.state_rgba(card.state)
+            sc = cards.card_rgba(card)
             sw = blf.dimensions(FONT, card.state_text)[0]
             blf.color(FONT, min(1.0, sc[0] * 1.6 + 0.2), min(1.0, sc[1] * 1.6 + 0.2), min(1.0, sc[2] * 1.6 + 0.2), 1.0)
             blf.position(FONT, x0 + width - PAD - sw, y + 4, 0)
@@ -306,7 +309,7 @@ class DUCKPOND_OT_hover(bpy.types.Operator):
                 blf.size(FONT, 13)
                 y -= LINE_H + 10
             if card.highlight:
-                sc = cards.state_rgba(card.state)
+                sc = cards.card_rgba(card)
                 blf.color(FONT, min(1.0, sc[0] * 1.6 + 0.25), min(1.0, sc[1] * 1.6 + 0.25), min(1.0, sc[2] * 1.6 + 0.25), 1.0)
                 blf.position(FONT, x, y, 0)
                 blf.draw(FONT, card.highlight)

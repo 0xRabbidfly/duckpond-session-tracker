@@ -7,6 +7,23 @@ All notable changes to Duck Pond are recorded here. The format follows
 ## [Unreleased]
 
 ### Added
+- **A washing line.** An agent says it is done and swims off, and whether anyone committed
+  what it wrote was a question the pool never asked. Now every folder a session is in, and
+  every folder that spent anything in the last day, gets a `git status` every 20 seconds, and
+  what is outstanding hangs on a line on the far deck: a towel per file (navy changed, white
+  new, red conflict), one folded over the line per commit the remote lacks, and a card per
+  repository whose name turns gold when no live duck is working in it -- the laundry was left
+  out. The line outlives the ducks on purpose. Three repositories fit, left-out ones first,
+  pegs shared so every small count is exact; the rest are never dropped but added up on a
+  `+N more` card at the end of the line, and hovering the line lists every repository with its
+  counts (`cards.laundry_card`). A clean sweep reads `all put away`. Strictly
+  read-only: `git --no-optional-locks` never refreshes the index, so an agent's own commit can
+  never find `index.lock` taken, and a test proves it against a real repository, with a plain
+  `git status` as the control. A branch with no upstream still counts its commits (`rev-list
+  HEAD --not --remotes`); a repo with no remote counts none. The towels flap harder when the
+  fleet is busy and pick up the lido light after dark. Placement was measured against the
+  screen-space board and the far deck's lamps, both of which it clears at 1080p. Off in the
+  sidebar; the demo hangs a sample (`duck_pond/laundry.py`, `duck_pond/scene/laundry.py`).
 - **The deck mosaic.** One row per project, one tile per hour, brightness for spend, set into
   the near paving -- the largest piece of the frame that had nothing in it. The board says
   what the whole fleet spent in the last day; this says which folder spent it and when, which

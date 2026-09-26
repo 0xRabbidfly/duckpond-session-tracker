@@ -16,8 +16,10 @@ sys.path.insert(0, ROOT)
 import duck_pond  # noqa: E402
 from duck_pond.adapters.stub import StubAdapter  # noqa: E402
 from duck_pond.cli_version import Versions  # noqa: E402
+from duck_pond.laundry import Laundry, Wash, sample  # noqa: E402
 from duck_pond.runtime import RT  # noqa: E402
 from duck_pond.scene import bather as bather_mod  # noqa: E402
+from duck_pond.scene import laundry as line_mod  # noqa: E402
 from duck_pond.scene import mosaic as mosaic_mod  # noqa: E402
 from duck_pond.scene import pitchers as pitchers_mod  # noqa: E402
 from duck_pond.scene import plane as plane_mod  # noqa: E402
@@ -280,6 +282,81 @@ check(_plate_w - _text_w < 2.0, f"but not by a mile ({_plate_w - _text_w:.2f})")
 _px = obj("DP_PlaneRoot").location.x
 check(plane_mod.X0 < _px < plane_mod.X1, f"and it is somewhere over the pool ({_px:.1f})")
 check(obj("DP_PlaneRoot").location.y > 16.5, "beyond the lawn's edge, so nothing hides it")
+# the washing line: uncommitted work on the far deck. A test never runs git, so the demo's
+# sample goes up by hand, the way the jugs and the banner get theirs.
+check(not RT.laundry._thread, "a headless run never starts the git reader")
+_live = [s.cwd for s in RT.fleet.live_sessions()]
+RT.laundry.set_snapshot(sample(list(RT.lanes.keys)))
+RT.line.update(RT.laundry.snapshot(), _live)
+_hung = [o for o in RT.line.towels if not o.hide_render]
+check(0 < len(_hung) == RT.line.hung, f"towels are on the line ({len(_hung)})")
+_kinds = sorted({o["dp_laundry"] for o in _hung})
+check(_kinds == ["changed", "conflict", "folded", "new"], f"every kind of towel is hung ({_kinds})")
+_cards = [c for c in RT.line.cards if not c["name"].hide_render]
+_names = [c["name"].data.body for c in _cards]
+check(_names == ["billing", "docs-site", "storefront", "+1 more"],
+      f"three repositories on the line, the left-out one included, and the fourth counted ({_names})")
+for _c in _cards:
+    _gold = _c["name"].data.materials[0].name == "DP_TextGold"
+    check(_gold == (_c["name"].data.body == "billing"),
+          f"{_c['name'].data.body}: gold only when no duck is with it")
+check(all(abs(o.location.z - line_mod.line_z(o.location.x)) < 1e-6 for o in _hung), "every towel hangs from the line")
+# what hangs never crowds the android or the table, and no two things share a peg
+_spans = sorted([(o.location.x - line_mod.PITCH / 2, o.location.x + line_mod.PITCH / 2) for o in _hung]
+                + [(c["root"].location.x - c["w"] / 2, c["root"].location.x + c["w"] / 2) for c in _cards])
+check(_spans[0][0] >= line_mod.X0 - 1e-6 and _spans[-1][1] <= line_mod.X1 + 1e-6,
+      f"the line stays between the android and the table ({_spans[0][0]:.2f}..{_spans[-1][1]:.2f})")
+check(all(a[1] <= b[0] + 1e-6 for a, b in zip(_spans, _spans[1:])), "nothing on the line overlaps anything else")
+bpy.context.view_layer.update()
+for _c in _cards:
+    _tw = max(t.dimensions.x for t in (_c["name"], *_c["lines"]))
+    _pw = _c["plate"].dimensions.x
+    check(_tw < _pw < _tw + 0.5, f"{_c['name'].data.body}: the card fits its text ({_pw:.2f} for {_tw:.2f})")
+# the wind stirs them, harder when the fleet is busy, never past its limit
+RT.line.flap(0.0, chop=0.0)
+_a0 = [o.rotation_euler.x for o in _hung]
+RT.line.flap(0.8, chop=1.0)
+_a1 = [o.rotation_euler.x for o in _hung]
+check(any(abs(a - b) > 0.01 for a, b in zip(_a0, _a1)), "the towels move in the wind")
+check(max(abs(a) for a in _a0) <= line_mod.FLAP_CALM + 1e-6 and max(abs(a) for a in _a1) <= line_mod.FLAP_BUSY + 1e-6,
+      "and never swing further than the wind allows")
+# six repositories: three on the line, the rest added up on a "+3 more" card at its end, never dropped
+_six = Laundry(tuple(Wash(root=f"C:/x/{n}", changed=c, ahead=a) for n, c, a in (
+    ("api", 4, 1), ("web", 7, 0), ("mobile", 2, 2), ("infra", 3, 0), ("docs", 1, 1), ("tools", 5, 0))), ok=True)
+RT.line.update(_six, [f"C:/x/{n}" for n in ("api", "web", "mobile", "infra", "docs")])   # tools is left out
+_spare = RT.line.cards[line_mod.MAX_GROUPS]
+check(not _spare["name"].hide_render and _spare["name"].data.body == "+3 more",
+      f"repos that do not fit are counted on a card, not dropped ({_spare['name'].data.body!r})")
+check(_spare["lines"][0].data.body == "6 to commit" and _spare["lines"][1].data.body == "3 to push",   # mobile, infra, docs
+      f"and it adds them up ({_spare['lines'][0].data.body!r}, {_spare['lines'][1].data.body!r})")
+_shown = [c["name"].data.body for c in RT.line.cards[:line_mod.MAX_GROUPS]]
+check("tools" in _shown, f"the left-out repo makes the line, whatever its size ({_shown})")
+check(_spare["name"].data.materials[0].name != "DP_TextGold", "nothing left out among the rest: no gold")
+_hung6 = [o for o in RT.line.towels if not o.hide_render]
+_spans6 = sorted([(o.location.x - line_mod.PITCH / 2, o.location.x + line_mod.PITCH / 2) for o in _hung6]
+                 + [(c["root"].location.x - c["w"] / 2, c["root"].location.x + c["w"] / 2)
+                    for c in RT.line.cards if not c["name"].hide_render])
+check(len(_spans6) == len(_hung6) + 4 and _spans6[0][0] >= line_mod.X0 - 1e-6 and _spans6[-1][1] <= line_mod.X1 + 1e-6,
+      f"four cards and {len(_hung6)} towels, all between the android and the table "
+      f"({_spans6[0][0]:.2f}..{_spans6[-1][1]:.2f})")
+check(all(a[1] <= b[0] + 1e-6 for a, b in zip(_spans6, _spans6[1:])), "and still nothing overlaps")
+check(_spare["root"].location.x == max(c["root"].location.x for c in RT.line.cards if not c["name"].hide_render),
+      "the +N card hangs last on the line")
+check(RT.agent_for_object(_hung6[0]) == ("laundry", None) and RT.agent_for_object(_spare["plate"]) == ("laundry", None),
+      "hovering a towel or a card asks for the line's card, which lists every repository")
+# a long name is cut to the card, an empty reading takes the washing in, a clean one says so
+RT.line.update(Laundry((Wash(root="C:/x/an-extremely-long-repository-name", changed=2),), ok=True), [])
+check(RT.line.cards[0]["name"].data.body.endswith("…") and len(RT.line.cards[0]["name"].data.body) == line_mod.NAME_CHARS,
+      f"a long repository name is cut ({RT.line.cards[0]['name'].data.body!r})")
+RT.line.update(Laundry(), _live)
+check(all(o.hide_render for o in RT.line.towels) and all(c["name"].hide_render for c in RT.line.cards),
+      "no reading: the line is bare")
+RT.line.update(Laundry((Wash(root="C:/x/a"), Wash(root="C:/x/b")), ok=True), _live)
+check([RT.line.cards[0]["name"].data.body, RT.line.cards[0]["lines"][0].data.body] == ["all put away", "2 repos clean"]
+      and not RT.line.cards[0]["name"].hide_render and RT.line.hung == 0,
+      "everything committed and pushed: one card says so, and no towels")
+RT.laundry.set_snapshot(sample(list(RT.lanes.keys)))   # the still below shows the demo's line
+RT.line.update(RT.laundry.snapshot(), _live)
 check(len(RT.ripples.active_rings) > 0, "water has active ripple rings")
 check(obj("DP_Duck_cc-opus-2").location.z < -0.08, "opus at 91 % of its 1M context sits low in the water")
 check(obj("DP_Duck_vscode-4").rotation_euler.y > 0.1, "tool-running duck dips its head")

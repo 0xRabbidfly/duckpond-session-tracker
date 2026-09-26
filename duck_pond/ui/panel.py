@@ -46,6 +46,7 @@ class VIEW3D_PT_duck_pond(bpy.types.Panel):
         sub = row.row(align=True)
         sub.enabled = props.limits
         sub.prop(props, "limits_every_min", text="every")
+        box.prop(props, "laundry", toggle=True)
 
         box = layout.box()
         box.label(text="View")

@@ -7,6 +7,7 @@ import bpy
 
 from .adapters.claude_code import ClaudeCodeAdapter
 from .adapters.stub import StubAdapter
+from .laundry import Laundry
 from .ledger import RANGE_ORDER, RANGES
 from .runtime import RT
 from .scene import pool as P
@@ -99,6 +100,26 @@ def _on_limits(self, context):
         RT.limits.stop()
 
 
+def _configure_laundry(props) -> None:
+    """The washing line runs `git status` in every folder a session used. The demo's folders
+    are made up, so a pool showing only the demo hangs a sample line instead; off takes the
+    washing in."""
+    RT.laundry.enabled = bool(props.laundry)
+    if not props.laundry:
+        RT.laundry.stop()
+        RT.laundry.set_snapshot(Laundry())
+    demo = bool(props.use_stub and not props.use_claude)
+    RT.laundry.set_sample(demo)
+    if demo:
+        RT.laundry.stop()
+
+
+def _on_laundry(self, context):
+    _configure_laundry(self)
+    if self.laundry and RT.running and not bpy.app.background:
+        RT.laundry.start()
+
+
 def _on_legend(self, context):
     RT.show_legend = self.legend
 
@@ -135,6 +156,10 @@ class DuckPondSettings(bpy.types.PropertyGroup):
                                             update=_on_limits,
                                             description="How often to ask the CLI. Lower costs more tokens; "
                                                         "the windows move slowly, so 15 minutes is plenty")
+    laundry: bpy.props.BoolProperty(name="Washing line (git)", default=True, update=_on_laundry,
+                                    description="Hang uncommitted files and unpushed commits on a line on the "
+                                                "far deck. Runs a read-only `git status` in each folder your "
+                                                "sessions used, every 20 seconds")
     herdr_focus: bpy.props.BoolProperty(name="Click a duck to focus Herdr", default=True,
                                         update=_on_herdr,
                                         description="Clicking a duck brings its terminal to the front in Herdr. "
@@ -155,6 +180,9 @@ def build_adapters(props=None):
     if prefs:
         RT.color_overrides = parse_overrides(prefs.harness_colors_json, {}) or {}
         RT.hat_overrides = [tuple(x) for x in (parse_overrides(prefs.hat_map_json, []) or []) if len(x) == 2]
+    # here, not in the Start operator: dev/launch.py (and so DuckPond.exe) builds its adapters
+    # and starts the runtime itself, and the line has to know before start whether it is a demo
+    _configure_laundry(props)
     return adapters
 
 

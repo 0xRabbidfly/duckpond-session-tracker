@@ -10,6 +10,7 @@ from __future__ import annotations
 import time
 from dataclasses import dataclass, field
 
+from ..laundry import Laundry, all_clear, caption, left_out, ranked
 from ..ledger import RANGE_ORDER, RANGES, fmt_stats, fmt_usd
 from ..model import Fleet, Session, SubAgent
 from ..theme import (
@@ -60,6 +61,11 @@ def state_rgba(state: str) -> tuple[float, float, float, float]:
     return hex_to_rgba(STATE_COLORS.get(state, "#8A93A6"))
 
 
+def card_rgba(card) -> tuple[float, float, float, float]:
+    """The colour a card's bar and highlight are drawn in: its own, or its agent's state's."""
+    return hex_to_rgba(card.color) if card.color else state_rgba(card.state)
+
+
 @dataclass
 class Card:
     title: str
@@ -72,6 +78,7 @@ class Card:
     highlight: str = ""            # a question or a denial, drawn in the state colour
     tool_mix: list[tuple[str, int, str]] = field(default_factory=list)  # (chip text, count, hex)
     inferred: bool = False
+    color: str = ""                # a card that is not about an agent names its own colour
 
 
 def _state_text(agent, now: float) -> str:
@@ -400,3 +407,38 @@ def heat_model(fleet: Fleet, now: float, board_range: str = "hour",
     else:
         h.foot = f"nothing in the {label.replace('last ', '')}"
     return h
+
+
+# ------------------------------------------------------------------ the washing line
+LAUNDRY_LINES = 10         # repositories listed on the hover card before "and N more"
+LEFT_OUT_GOLD = "#F5C542"  # the gold the line's cards use for laundry nobody is with
+
+
+def laundry_card(snap: Laundry, live_cwds=(), redact_on: bool = True) -> Card:
+    """The hover card for the washing line: every repository with laundry, not just the three
+    that fit on the line, most in need of you first."""
+    washes = ranked(snap.washes, live_cwds)
+    out = [w for w in washes if left_out(w, live_cwds)]
+    clean = sum(1 for w in snap.washes if not w.items)
+    c = Card(title="Washing line", state="", state_text="", color=LEFT_OUT_GOLD if out else "#8FA8D6")
+    if not snap.ok:
+        c.subtitle = "no reading yet: git has not answered"
+        return c
+    if not washes:
+        done = all_clear(snap)
+        c.subtitle = " · ".join(done) if done else "no repositories to look at yet"
+        return c
+    c.state_text = f"{len(out)} left out" if out else plural(len(washes), "repo")
+    c.subtitle = "work nobody has committed or pushed, most in need of you first"
+    if out:
+        c.highlight = "left out, no duck with it: " + ", ".join(w.name for w in out[:4]) + (
+            f" +{len(out) - 4}" if len(out) > 4 else "")
+    for w in washes[:LAUNDRY_LINES]:
+        branch = (f"  ({redact(w.branch, redact_on, 24)})"
+                  if w.branch and w.branch not in ("main", "master", "(detached)") else "")
+        c.lines.append(f"{w.name}{branch}   " + " · ".join(caption(w)))
+    if len(washes) > LAUNDRY_LINES:
+        c.lines.append(f"… and {len(washes) - LAUNDRY_LINES} more")
+    if clean:
+        c.lines.append(plural(clean, "other repo") + " all put away")
+    return c

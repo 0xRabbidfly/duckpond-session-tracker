@@ -29,6 +29,7 @@ tells you who it is and what it is doing. Idle ducks float. Thinking ducks paddl
 | API error / retry | Duck wobbles hard once, red ripple ring |
 | Working directory / repo | Pool lane (lane ropes with floats). Ducks in the same lane share a checkout |
 | Git branch | Small flag on the duck's tail; text = branch name |
+| Work not committed / commits not pushed | Towels on a washing line on the far deck / towels folded over it |
 
 ## 3. Scope
 

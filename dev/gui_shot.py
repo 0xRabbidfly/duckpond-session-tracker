@@ -2,6 +2,7 @@
 
     blender --python dev/gui_shot.py -- --out out/gui_tags.png --at 9 --kiosk
     blender --python dev/gui_shot.py -- --out out/gui_card.png --at 9 --pin cc-fable-1
+    blender --python dev/gui_shot.py -- --out out/gui_line.png --at 9 --line   # the washing line's card
 
 Used to verify the screen-space overlay (hover card, name tags), which headless renders
 cannot show. The stub fixture is run at 1x; `--at` is the fixture second to shoot at.
@@ -38,6 +39,7 @@ PIN = arg("--pin", None)
 KIOSK = "--kiosk" in args
 CLOCK = arg("--clock", None)
 PLANE = arg("--plane", None)   # 0..1: park the banner that far into its crossing
+LINE = "--line" in args        # hover the washing line: its card lists every repository
 
 duck_pond.register()
 props = bpy.context.window_manager.duck_pond
@@ -78,6 +80,8 @@ def _go():
     # and a sample pair for the banner plane, so a screenshot needs no network
     RT.versions.enabled = False
     RT.versions.set_snapshot(Versions(yours="2.1.273", latest="2.1.278"))
+    # and the demo's sample washing line: its folders are made up, so there is no git to ask
+    RT.laundry.set_sample(True)
     RT.start([stub])
     RT.tags_for_all = KIOSK
     if CLOCK is not None:
@@ -121,6 +125,15 @@ def _shoot():
         RT.pinned = (PIN, "")
         RT.hover = RT.pinned
         RT.hover_kind = "duck"
+        for a in bpy.context.screen.areas:
+            a.tag_redraw()
+        bpy.app.timers.register(_save, first_interval=0.6)
+        return None
+    if LINE:
+        # the real mouse over this window re-casts on every move and would clear it at once
+        from duck_pond.ui.hover import DUCKPOND_OT_hover
+        DUCKPOND_OT_hover._cast = lambda self, context, event: None
+        RT.hover, RT.hover_kind = None, "laundry"
         for a in bpy.context.screen.areas:
             a.tag_redraw()
         bpy.app.timers.register(_save, first_interval=0.6)

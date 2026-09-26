@@ -46,6 +46,7 @@ but skips its effect.
 | Herdr | `herdr.py` | no | Optional. Maps a session id to a terminal pane and raises it. `pane_in` is pure; the rest is subprocess and Win32, always on a thread. |
 | Mosaic | `ui/cards.heat_model`, `scene/mosaic.py` | model no, scene yes | The per-project history. What it says is a pure value the tests read; `mosaic.py` only paints tiles. |
 | Versions | `cli_version.py` | no | Optional. Yours from `claude --version`, the published one from the npm registry over HTTP. Parsing and comparison are pure; the fetching is on a thread. |
+| Laundry | `laundry.py`, `scene/laundry.py` | model no, scene yes | Optional. `git --no-optional-locks status` in every folder a session used, on a thread; never writes to a repository. Parsing and every choice about what hangs where (`pick`, `allot`, `towels`, `caption`) are pure; the scene only measures cards and hangs towels. |
 
 The pure layers are why `python tests/test_core.py` works without Blender. Keep new logic
 in `model.py` when you can and let the scene read the result.
@@ -129,3 +130,4 @@ on position and look-at, with a priority queue of things worth looking at.
 | `tests/headless_director.py` | yes | camera acceleration and turn bounds; that it never moves unpinned; sky continuity |
 | `tests/headless_watchdog.py` | yes | the watchdog revives playback, the data timer, the frame handler and the worker |
 | `tests/test_usage.py` | no | parsing `claude -p /usage` into the two limit gauges |
+| `tests/test_laundry.py` | no (git, if present) | parsing `git status --porcelain=v2` as git 2.51 prints it, sharing pegs, and -- against real temporary repositories -- that reading never rewrites `.git/index` |

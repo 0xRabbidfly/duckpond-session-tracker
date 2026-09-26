@@ -42,6 +42,7 @@ python tests\test_signals.py                             # questions, denials, c
 python tests\test_herdr.py                               # picking a Herdr pane from a session id
 python tests\test_cli_version.py                         # yours vs the published CLI version
 python tests\test_mosaic.py                              # per-project spend per hour, and its labels
+python tests\test_laundry.py                             # the washing line: git status, pegs, never writes to a repo
 blender -b --python tests\headless_motion.py             # the smoothness contract
 blender -b --python tests\headless_smoke.py              # builds the demo, checks every visual, renders a still
 blender -b --python tests\headless_director.py           # camera + sky continuity under a busy fleet

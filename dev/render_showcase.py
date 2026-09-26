@@ -40,6 +40,8 @@ RT.limits.set_snapshot(Usage(session=Gauge(0.31, "8:30pm"),
 # and a sample pair for the banner plane, so a screenshot needs no network
 RT.versions.enabled = False
 RT.versions.set_snapshot(Versions(yours="2.1.273", latest="2.1.278"))
+# and the demo's sample washing line: its folders are made up, so there is no git to ask
+RT.laundry.set_sample(True)
 RT.start([stub], gui=False)
 RT.sky.clock_override = 16.5  # late afternoon for the day shots
 t0 = time.time()
